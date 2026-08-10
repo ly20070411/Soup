@@ -10,23 +10,24 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 66ca902f8bc51874da92c31d2c087edb, type: 3}
-  m_Name: Ingredient_ginger
+  m_Name: "Ingredient_\u65B0\u98DF\u6750 2"
   m_EditorClassIdentifier: 
-  id: magic leaf
-  displayName: "\u9B54\u6CD5\u53F6"
-  description: "\u7D20\u98DF\uFF0C\u4F60\u6C38\u8FDC\u4E0D\u77E5\u9053\u4E0B\u4E00\u53E3\u662F\u4EC0\u4E48\u5473\u9053"
+  id: big-horn beast
+  displayName: "\u5927\u89D2\u517D"
+  description: "\u5916\u90E8\u8089\u8D28\u575A\u786C\uFF0C\u5185\u90E8\u67D4\u8F6F\u7684\u7F8E\u5473\u98DF\u6750"
   icon: {fileID: 0}
   tint: {r: 1, g: 1, b: 1, a: 1}
-  category: 0
+  category: 1
   tags:
+  - "\u8089\u7C7B"
   - "\u67D4\u8F6F"
-  - "\u968F\u673A"
+  - "\u575A\u56FA"
   price: 0
-  rarity: 1
+  rarity: 0
   maxStack: 1
   weight: 0
   stats:
   - key: "\u67D4\u8F6F\u98DF\u6750"
     value: 5
-  - key: "\u968F\u673A\u6548\u679C"
-    value: 1
+  - key: "\u575A\u56FA\u98DF\u6750"
+    value: 10

@@ -12,32 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 66ca902f8bc51874da92c31d2c087edb, type: 3}
   m_Name: Ingredient_tomato
   m_EditorClassIdentifier: 
-  id: tomato
-  displayName: "\u756A\u8304"
-  description: "\u9178\u751C\u591A\u6C41\u7684\u57FA\u7840\u6C64\u5E95\u98DF\u6750\u3002"
+  id: berry
+  displayName: "\u5C0F\u751C\u679C"
+  description: "\u7D20\u98DF\uFF0C\u5F88\u57FA\u7840\u7684\u98DF\u6750"
   icon: {fileID: 0}
   tint: {r: 1, g: 1, b: 1, a: 1}
   category: 0
   tags:
-  - "\u852C\u83DC"
-  - "\u6C64\u5E95"
-  - "\u7EA2\u8272"
-  price: 8
+  - "\u7D20\u98DF"
+  - "\u67D4\u8F6F"
+  price: 0
   rarity: 1
-  maxStack: 99
-  weight: 1
+  maxStack: 1
+  weight: 0
   stats:
-  - key: salty
-    value: 0.2
-  - key: sweet
-    value: 1.5
-  - key: sour
-    value: 2
-  - key: bitter
-    value: 0
-  - key: umami
-    value: 1
-  - key: heat
-    value: 0
-  - key: cookTime
-    value: 1.2
+  - key: "\u67D4\u8F6F\u98DF\u6750"
+    value: 3

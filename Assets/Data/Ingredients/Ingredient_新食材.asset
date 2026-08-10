@@ -12,18 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 66ca902f8bc51874da92c31d2c087edb, type: 3}
   m_Name: "Ingredient_\u65B0\u98DF\u6750"
   m_EditorClassIdentifier: 
-  id: "ingredient_\u65B0\u98DF\u6750"
-  displayName: "\u65B0\u98DF\u6750"
-  description: 
+  id: ice fruit
+  displayName: "\u51B0\u6676\u679C"
+  description: "\u7D20\u98DF\uFF0C\u53C8\u51B0\u53C8\u786C\uFF0C\u98CE\u5473\u72EC\u7279"
   icon: {fileID: 0}
   tint: {r: 1, g: 1, b: 1, a: 1}
-  category: 99
+  category: 0
   tags:
-  - "\u98DF\u6750"
+  - "\u7D20\u98DF"
+  - "\u575A\u56FA"
+  - "\u5BD2\u51B7"
   price: 0
   rarity: 0
-  maxStack: 99
+  maxStack: 1
   weight: 1
   stats:
-  - key: salty
-    value: 0
+  - key: "\u575A\u56FA\u98DF\u6750"
+    value: 5
+  - key: "\u5BD2\u51B7"
+    value: 1

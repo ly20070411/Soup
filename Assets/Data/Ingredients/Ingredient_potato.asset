@@ -12,31 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 66ca902f8bc51874da92c31d2c087edb, type: 3}
   m_Name: Ingredient_potato
   m_EditorClassIdentifier: 
-  id: potato
-  displayName: "\u571F\u8C46"
-  description: "\u539A\u5B9E\u8F6F\u7CEF\uFF0C\u589E\u52A0\u6C64\u7684\u9971\u8179\u611F\u3002"
+  id: mushroom
+  displayName: "\u8611\u83C7"
+  description: "\u7D20\u98DF\uFF0C\u5F88\u57FA\u7840\u7684\u98DF\u7269"
   icon: {fileID: 0}
   tint: {r: 1, g: 1, b: 1, a: 1}
   category: 0
   tags:
-  - "\u852C\u83DC"
-  - "\u6DC0\u7C89"
-  price: 6
+  - "\u7D20\u98DF"
+  - "\u67D4\u8F6F"
+  price: 0
   rarity: 0
-  maxStack: 99
-  weight: 1
+  maxStack: 1
+  weight: 0
   stats:
-  - key: salty
-    value: 0.1
-  - key: sweet
-    value: 0.6
-  - key: sour
-    value: 0
-  - key: bitter
-    value: 0
-  - key: umami
-    value: 0.4
-  - key: heat
-    value: 0
-  - key: cookTime
+  - key: "\u67D4\u8F6F\u98DF\u6750"
     value: 2

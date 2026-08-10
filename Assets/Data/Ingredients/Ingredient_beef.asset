@@ -12,31 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 66ca902f8bc51874da92c31d2c087edb, type: 3}
   m_Name: Ingredient_beef
   m_EditorClassIdentifier: 
-  id: beef
-  displayName: "\u725B\u8089"
-  description: "\u6D53\u90C1\u8089\u9999\uFF0C\u63D0\u5347\u9C9C\u5473\u3002"
+  id: sour fruit
+  displayName: "\u9752\u9178\u679C"
+  description: "\u7D20\u98DF\uFF0C\u9178\u6DA9\u5F00\u80C3"
   icon: {fileID: 0}
   tint: {r: 1, g: 1, b: 1, a: 1}
-  category: 1
+  category: 0
   tags:
-  - "\u8089\u7C7B"
-  - "\u9AD8\u86CB\u767D"
-  price: 28
+  - "\u7D20\u98DF"
+  - "\u67D4\u8F6F"
+  - "\u9178\u6DA9"
+  price: 0
   rarity: 2
-  maxStack: 99
+  maxStack: 1
   weight: 1
   stats:
-  - key: salty
-    value: 0.5
-  - key: sweet
-    value: 0
-  - key: sour
-    value: 0
-  - key: bitter
-    value: 0
-  - key: umami
-    value: 3
-  - key: heat
-    value: 0.2
-  - key: cookTime
-    value: 3.5
+  - key: "\u67D4\u8F6F\u98DF\u6750"
+    value: 5
+  - key: "\u9178\u6DA9"
+    value: 1
