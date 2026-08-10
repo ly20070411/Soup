@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa230fb38fc970c48893661cc9aa943e, type: 3}
+  m_Name: Job_magic_leaf
+  m_EditorClassIdentifier: 
+  id: magic_leaf
+  displayName: "\u9B54\u6CD5\u53F6"
+  description: "\u91C7\u96C6\u9B54\u6CD5\u53F6\u3002"
+  icon: {fileID: 0}
+  tint: {r: 1, g: 1, b: 1, a: 1}
+  jobType: 0
+  maxWorkers: 5
+  gatherAmountPerWorker: 2
+  outputIngredient: {fileID: 11400000, guid: 486d7dd2c1496ae4d95a0929fc65d207, type: 2}
+  gatherMaterial: 0
+  materialPerGatherUnit: 1
+  spicyPerGatherUnit: 0
+  sourPerGatherUnit: 0
+  coldPerGatherUnit: 0
+  magicPerGatherUnit: 0
+  processAmountPerWorker: 10
+  preferredMaterial: 0
+  otherMaterialEfficiency: 0.5
+  processRandom: 0
+  cookAmountPerWorker: 10
+  scoreMultiplier: 1

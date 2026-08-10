@@ -28,7 +28,8 @@ namespace Soup.Items
             {
                 var go = new GameObject(nameof(IngredientManager));
                 Instance = go.AddComponent<IngredientManager>();
-                DontDestroyOnLoad(go);
+                if (Application.isPlaying)
+                    DontDestroyOnLoad(go);
             }
 
             Instance.database = db;

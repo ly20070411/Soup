@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa230fb38fc970c48893661cc9aa943e, type: 3}
+  m_Name: Job_medium_heat
+  m_EditorClassIdentifier: 
+  id: medium_heat
+  displayName: "\u4E2D\u706B"
+  description: "\u4E2D\u706B\u70F9\u996A\uFF0C\u6548\u7387\u4E0E\u500D\u7387\u6298\u4E2D\u3002"
+  icon: {fileID: 0}
+  tint: {r: 1, g: 1, b: 1, a: 1}
+  jobType: 2
+  maxWorkers: 0
+  gatherAmountPerWorker: 1
+  outputIngredient: {fileID: 0}
+  gatherMaterial: 0
+  materialPerGatherUnit: 1
+  spicyPerGatherUnit: 0
+  sourPerGatherUnit: 0
+  coldPerGatherUnit: 0
+  magicPerGatherUnit: 0
+  processAmountPerWorker: 10
+  preferredMaterial: 0
+  otherMaterialEfficiency: 0.5
+  processRandom: 0
+  cookAmountPerWorker: 18
+  scoreMultiplier: 0.8

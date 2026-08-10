@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa230fb38fc970c48893661cc9aa943e, type: 3}
+  m_Name: Job_explosion
+  m_EditorClassIdentifier: 
+  id: explosion
+  displayName: "\u7206\u70B8"
+  description: "\u5904\u7406\u4EFB\u610F\u98DF\u6750\uFF08\u6BCF\u7CBE\u7075 8 \u4EFD\uFF09\uFF0C\u4F18\u5148\u5904\u7406\u5176\u4ED6\u5C97\u4F4D\u96BE\u4EE5\u5904\u7406\u7684\u6750\u8D28\u3002"
+  icon: {fileID: 0}
+  tint: {r: 1, g: 1, b: 1, a: 1}
+  jobType: 1
+  maxWorkers: 5
+  gatherAmountPerWorker: 1
+  outputIngredient: {fileID: 0}
+  gatherMaterial: 0
+  materialPerGatherUnit: 1
+  spicyPerGatherUnit: 0
+  sourPerGatherUnit: 0
+  coldPerGatherUnit: 0
+  magicPerGatherUnit: 0
+  processAmountPerWorker: 8
+  preferredMaterial: 99
+  otherMaterialEfficiency: 1
+  processRandom: 1
+  cookAmountPerWorker: 10
+  scoreMultiplier: 1
