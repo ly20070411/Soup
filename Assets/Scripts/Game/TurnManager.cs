@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Soup.Items;
 using Soup.Jobs;
+using Soup.Relics;
 using UnityEngine;
 
 namespace Soup.Game
@@ -66,6 +67,9 @@ namespace Soup.Game
             _lastTurnScore = 0;
             ResourceStore.Instance?.Clear();
             ElfManager.Instance?.ResetFromConfig();
+            RelicManager.Instance?.ResetRun();
+            JobProgressionManager.Instance?.ResetRun();
+            ElfManager.Instance?.ClearAssignments();
         }
 
         /// <summary>点击「下一回合」时调用。</summary>
@@ -80,14 +84,27 @@ namespace Soup.Game
             }
 
             var result = new TurnResult { TurnIndex = _turnIndex + 1 };
+            var relicCtx = BuildRelicContext(store, result);
 
-            ResolveGather(elves, store, result);
+            ResolveGather(elves, store, result, relicCtx);
+            RelicEffectRunner.Run(RelicTrigger.AfterGather, relicCtx);
+
             ResolveProcess(elves, store, result);
             FlavorResolver.ResolveCold(store, result);
             ResolveCook(elves, store, result);
-            FlavorResolver.ApplySpicyToCookScore(store, result);
+
+            RelicEffectRunner.Run(RelicTrigger.BeforeSpicy, relicCtx);
+            FlavorResolver.ApplySpicyToCookScore(
+                store,
+                result,
+                relicCtx.SpicyMultiplierCap,
+                relicCtx.SpicyUncapped);
+
             FlavorResolver.ResolveSour(store, result);
             FlavorResolver.ResolveMagic(elves, store, result);
+
+            RelicEffectRunner.Run(RelicTrigger.AfterScore, relicCtx);
+            ApplyFinalMultiplier(result, relicCtx);
 
             _turnIndex = result.TurnIndex;
             _lastTurnCooked = result.CookedGained;
@@ -98,7 +115,46 @@ namespace Soup.Game
             return result;
         }
 
-        private static void ResolveGather(ElfManager elves, ResourceStore store, TurnResult result)
+        private static RelicContext BuildRelicContext(ResourceStore store, TurnResult result)
+        {
+            var ctx = new RelicContext(store, result)
+            {
+                ApplyYield = yield => ApplyIngredientYield(store, result, yield)
+            };
+
+            float cap = 3f;
+            var config = store.Config;
+            if (config != null)
+                cap = config.SpicyMultiplierCap;
+            else
+            {
+                var loaded = Resources.Load<GameConfig>(ResourceStore.ResourcesConfigPath);
+                if (loaded != null)
+                    cap = loaded.SpicyMultiplierCap;
+            }
+
+            ctx.SpicyMultiplierCap = cap;
+            return ctx;
+        }
+
+        private static void ApplyFinalMultiplier(TurnResult result, RelicContext relicCtx)
+        {
+            if (result == null || relicCtx == null) return;
+
+            float mult = Mathf.Max(0f, relicCtx.FinalMultiplier);
+            result.FinalMultiplier = mult;
+            if (Mathf.Approximately(mult, 1f) || result.ScoreGained == 0)
+                return;
+
+            int before = result.ScoreGained;
+            result.ScoreGained = GameMath.CeilToInt(before * mult);
+        }
+
+        private static void ResolveGather(
+            ElfManager elves,
+            ResourceStore store,
+            TurnResult result,
+            RelicContext relicCtx)
         {
             foreach (var pair in elves.GetAssignments())
             {
@@ -110,9 +166,9 @@ namespace Soup.Game
                 int units = workers * job.GatherAmountPerWorker;
                 if (units <= 0) continue;
 
-                // Job produces ingredient units; ingredient stats convert to materials/flavors.
                 if (job.OutputIngredient != null)
                 {
+                    relicCtx?.RecordGather(job.OutputIngredient, units);
                     ApplyIngredientYield(
                         store,
                         result,
@@ -120,12 +176,12 @@ namespace Soup.Game
                     continue;
                 }
 
-                // Fallback when a gather job has no linked ingredient.
+                relicCtx?.RecordGatherUnitsOnly(units);
                 ApplyLegacyGatherConversion(store, result, job, units);
             }
         }
 
-        private static void ApplyIngredientYield(
+        public static void ApplyIngredientYield(
             ResourceStore store,
             TurnResult result,
             IngredientYield yield)
@@ -186,7 +242,6 @@ namespace Soup.Game
 
         private static void ResolveProcess(ElfManager elves, ResourceStore store, TurnResult result)
         {
-            // Pass 1: preferred-material stations (刀切 / 电锯 / 钻头).
             foreach (var pair in elves.GetAssignments())
             {
                 var job = pair.Key;
@@ -205,7 +260,6 @@ namespace Soup.Game
                 }
             }
 
-            // Pass 2: explosion-style — any materials 1:1, prefer what others struggle with.
             foreach (var pair in elves.GetAssignments())
             {
                 var job = pair.Key;
@@ -263,11 +317,6 @@ namespace Soup.Game
             return produced;
         }
 
-        /// <summary>
-        /// Explosion: process any materials 1:1.
-        /// Prefer materials that other assigned process stations do not prefer
-        /// (e.g. with 刀切 active, Soft is easy → Tough/Solid first).
-        /// </summary>
         private static int ProcessExplosion(ElfManager elves, ResourceStore store, int capacity)
         {
             bool softEasy = false, toughEasy = false, solidEasy = false;
@@ -285,11 +334,9 @@ namespace Soup.Game
             }
 
             var order = new List<IngredientMaterial>(3);
-            // Hard-for-others first.
             if (!softEasy) order.Add(IngredientMaterial.Soft);
             if (!toughEasy) order.Add(IngredientMaterial.Tough);
             if (!solidEasy) order.Add(IngredientMaterial.Solid);
-            // Then leftovers that other stations prefer.
             if (softEasy) order.Add(IngredientMaterial.Soft);
             if (toughEasy) order.Add(IngredientMaterial.Tough);
             if (solidEasy) order.Add(IngredientMaterial.Solid);
@@ -311,7 +358,6 @@ namespace Soup.Game
 
             if (preferExcludeFirst && exclude != IngredientMaterial.Any)
             {
-                // For "other materials" consumption: skip preferred.
                 for (int i = 0; i < all.Length; i++)
                 {
                     if (all[i] != exclude)
@@ -390,6 +436,7 @@ namespace Soup.Game
         public int CookScoreBase;
         public int CookScore;
         public float SpicyMultiplier = 1f;
+        public float FinalMultiplier = 1f;
         public int ColdUsed;
         public int ColdScore;
         public int SourUsed;
@@ -404,6 +451,7 @@ namespace Soup.Game
                 $"flavor+{FlavorGained}, processed+{ProcessedGained}, " +
                 $"cook {ProcessedConsumed}→{CookedGained}, " +
                 $"score+{ScoreGained} (cook {CookScoreBase}→{CookScore}×{SpicyMultiplier:0.##}, " +
+                $"final×{FinalMultiplier:0.##}, " +
                 $"cold {ColdScore}, sour {SourScore}, magic {MagicScore})";
         }
     }

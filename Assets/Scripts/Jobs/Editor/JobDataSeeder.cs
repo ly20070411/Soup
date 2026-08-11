@@ -185,6 +185,7 @@ namespace Soup.Jobs.Editor
 
             item.SetGather(amountPerWorker, ingredient);
             item.SetGatherConversion(material, materialPerUnit, spicy, sour, cold, magic);
+            item.SeedDefaultUpgradeTiers();
             EditorUtility.SetDirty(item);
             db.Add(item);
         }
@@ -203,6 +204,7 @@ namespace Soup.Jobs.Editor
             item.SetDescription(description);
             item.SetMaxWorkers(DefaultProcessMaxWorkers);
             item.SetProcess(amountPerWorker, preferred, otherEfficiency, random);
+            item.SeedDefaultUpgradeTiers();
             EditorUtility.SetDirty(item);
             db.Add(item);
         }
@@ -218,6 +220,8 @@ namespace Soup.Jobs.Editor
             var item = GetOrCreate(db, id, displayName);
             item.SetDescription(description);
             item.SetCook(amountPerWorker, scoreMultiplier);
+            // Cook upgrades exist (once) but effects stay empty by design.
+            item.SeedDefaultUpgradeTiers();
             EditorUtility.SetDirty(item);
             db.Add(item);
         }

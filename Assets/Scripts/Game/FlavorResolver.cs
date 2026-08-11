@@ -46,8 +46,13 @@ namespace Soup.Game
         /// <summary>
         /// Independent multiplier on cook-station score:
         /// 1 + spicy * 2 / cookedThisTurn.
+        /// Optionally capped unless relics disable the cap.
         /// </summary>
-        public static void ApplySpicyToCookScore(ResourceStore store, TurnResult result)
+        public static void ApplySpicyToCookScore(
+            ResourceStore store,
+            TurnResult result,
+            float spicyMultiplierCap = 0f,
+            bool spicyUncapped = false)
         {
             if (store == null || result == null) return;
             if (result.CookScoreBase <= 0) return;
@@ -57,6 +62,9 @@ namespace Soup.Game
             float mult = 1f;
             if (cooked > 0 && spicy > 0)
                 mult = 1f + spicy * 2f / cooked;
+
+            if (!spicyUncapped && spicyMultiplierCap > 0f)
+                mult = Mathf.Min(mult, spicyMultiplierCap);
 
             int boosted = GameMath.CeilToInt(result.CookScoreBase * mult);
             int delta = boosted - result.CookScoreBase;

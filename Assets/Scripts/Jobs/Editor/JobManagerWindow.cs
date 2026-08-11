@@ -192,6 +192,23 @@ namespace Soup.Jobs.Editor
                 EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("maxWorkers"), new GUIContent("人数上限 (0=不限)"));
 
                 EditorGUILayout.Space(6);
+                EditorGUILayout.LabelField("岗位进阶", EditorStyles.boldLabel);
+                EditorGUILayout.HelpBox(
+                    $"最多升级 {JobProgressionRules.MaxUpgradesPerJob(_selectedItem.JobType)} 次。" +
+                    (JobProgressionRules.UsesPopulationCap(_selectedItem.JobType)
+                        ? " 默认每级 +5 人口；额外效果按「岗位及效果一览」填写。"
+                        : " 烹饪进阶效果暂留空，勿擅自填写。"),
+                    MessageType.None);
+                if (GUILayout.Button("按规则补齐进阶层", GUILayout.Width(140)))
+                {
+                    _selectedItem.SeedDefaultUpgradeTiers();
+                    EditorUtility.SetDirty(_selectedItem);
+                    _selectedSerialized.Update();
+                }
+                EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("upgradeTiers"), new GUIContent("进阶层"), true);
+                EditorGUILayout.HelpBox(_selectedItem.GetUpgradeSummary(), MessageType.Info);
+
+                EditorGUILayout.Space(6);
                 switch (_selectedItem.JobType)
                 {
                     case JobType.Gather:

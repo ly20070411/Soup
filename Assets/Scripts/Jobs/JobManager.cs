@@ -36,6 +36,15 @@ namespace Soup.Jobs
             Instance.database?.RebuildIndex();
         }
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void EnsureExists()
+        {
+            if (Instance != null) return;
+            var db = Resources.Load<JobDatabase>(ResourcesDatabasePath);
+            if (db == null) return;
+            Initialize(db);
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)

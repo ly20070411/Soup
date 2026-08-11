@@ -19,6 +19,11 @@ MonoBehaviour:
   tint: {r: 1, g: 1, b: 1, a: 1}
   jobType: 0
   maxWorkers: 5
+  upgradeTiers:
+  - maxWorkersBonus: 5
+    effectDescription: 
+  - maxWorkersBonus: 5
+    effectDescription: 
   gatherAmountPerWorker: 4
   outputIngredient: {fileID: 11400000, guid: 763b3bd3770cf4d4b9c6744d5003efe6, type: 2}
   gatherMaterial: 0

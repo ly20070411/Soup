@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Text;
 using Soup.Items;
 using UnityEngine;
 
@@ -23,8 +25,12 @@ namespace Soup.Jobs
         [SerializeField] private JobType jobType = JobType.Gather;
 
         [Header("Capacity")]
-        [Tooltip("Max workers for this station. 0 = unlimited (e.g. cooking).")]
+        [Tooltip("Base max workers for this station. 0 = unlimited (e.g. cooking).")]
         [SerializeField, Min(0)] private int maxWorkers;
+
+        [Header("Advancement")]
+        [Tooltip("Per-level upgrade definitions. Gather/Process: up to 2; Cook: up to 1.")]
+        [SerializeField] private List<JobUpgradeTier> upgradeTiers = new List<JobUpgradeTier>();
 
         [Header("Gather")]
         [SerializeField, Min(0)] private int gatherAmountPerWorker = 1;
@@ -56,6 +62,8 @@ namespace Soup.Jobs
         public JobType JobType => jobType;
         public int MaxWorkers => maxWorkers;
         public bool HasWorkerLimit => maxWorkers > 0;
+        public IReadOnlyList<JobUpgradeTier> UpgradeTiers => upgradeTiers;
+        public int DesignedMaxUpgradeLevel => JobProgressionRules.MaxUpgradesPerJob(jobType);
 
         public int GatherAmountPerWorker => gatherAmountPerWorker;
         public IngredientItem OutputIngredient => outputIngredient;
@@ -89,6 +97,80 @@ namespace Soup.Jobs
         public void SetJobType(JobType value) => jobType = value;
 
         public void SetMaxWorkers(int value) => maxWorkers = Mathf.Max(0, value);
+
+        public JobUpgradeTier GetUpgradeTier(int zeroBasedLevel)
+        {
+            if (upgradeTiers == null || zeroBasedLevel < 0 || zeroBasedLevel >= upgradeTiers.Count)
+                return null;
+            return upgradeTiers[zeroBasedLevel];
+        }
+
+        /// <summary>Population bonus for the first <paramref name="upgradeLevel"/> upgrades (1..N).</summary>
+        public int GetWorkersBonusForLevel(int upgradeLevel)
+        {
+            if (upgradeLevel <= 0 || upgradeTiers == null) return 0;
+
+            int bonus = 0;
+            int count = Mathf.Min(upgradeLevel, upgradeTiers.Count);
+            for (int i = 0; i < count; i++)
+            {
+                if (upgradeTiers[i] != null)
+                    bonus += upgradeTiers[i].MaxWorkersBonus;
+            }
+
+            return bonus;
+        }
+
+        public int GetEffectiveMaxWorkers(int upgradeLevel)
+        {
+            if (!HasWorkerLimit) return 0;
+            return maxWorkers + GetWorkersBonusForLevel(upgradeLevel);
+        }
+
+        public string GetUpgradeSummary()
+        {
+            EnsureUpgradeTierSize();
+            if (upgradeTiers == null || upgradeTiers.Count == 0)
+                return "无进阶";
+
+            var sb = new StringBuilder();
+            int show = Mathf.Min(DesignedMaxUpgradeLevel, upgradeTiers.Count);
+            for (int i = 0; i < show; i++)
+            {
+                if (upgradeTiers[i] == null) continue;
+                if (sb.Length > 0) sb.Append('\n');
+                sb.Append(upgradeTiers[i].ToSummary(i));
+            }
+
+            return sb.Length > 0 ? sb.ToString() : "无进阶";
+        }
+
+        public void EnsureUpgradeTierSize()
+        {
+            if (upgradeTiers == null)
+                upgradeTiers = new List<JobUpgradeTier>();
+
+            int target = DesignedMaxUpgradeLevel;
+            while (upgradeTiers.Count < target)
+            {
+                var tier = new JobUpgradeTier();
+                if (JobProgressionRules.UsesPopulationCap(jobType))
+                    tier.SetMaxWorkersBonus(JobProgressionRules.DefaultUpgradeWorkerBonus);
+                else
+                    tier.SetMaxWorkersBonus(0);
+                tier.SetEffectDescription(string.Empty);
+                upgradeTiers.Add(tier);
+            }
+
+            if (upgradeTiers.Count > target)
+                upgradeTiers.RemoveRange(target, upgradeTiers.Count - target);
+        }
+
+        public void SeedDefaultUpgradeTiers()
+        {
+            upgradeTiers = new List<JobUpgradeTier>();
+            EnsureUpgradeTierSize();
+        }
 
         public void SetGather(int amountPerWorker, IngredientItem ingredient)
         {
@@ -147,7 +229,8 @@ namespace Soup.Jobs
                         return $"每精灵产出 {gatherAmountPerWorker} 份{ingredientName} → {total.ToSummary()}";
                     }
                     return $"每精灵产出 {gatherAmountPerWorker} 份{ingredientName} → {materialPerGatherUnit}×{MaterialLabel(gatherMaterial)}";
-                }                case JobType.Process:
+                }
+                case JobType.Process:
                     if (processRandom || preferredMaterial == IngredientMaterial.Any)
                         return $"处理任意 {processAmountPerWorker} 份食材，优先其他岗位难处理材质";
                     return $"优先处理 {processAmountPerWorker} 份{MaterialLabel(preferredMaterial)}食材，其他材质效率 {otherMaterialEfficiency:0.##}";
@@ -232,6 +315,7 @@ namespace Soup.Jobs
             otherMaterialEfficiency = Mathf.Clamp01(otherMaterialEfficiency);
             cookAmountPerWorker = Mathf.Max(0, cookAmountPerWorker);
             scoreMultiplier = Mathf.Max(0f, scoreMultiplier);
+            EnsureUpgradeTierSize();
         }
 #endif
     }

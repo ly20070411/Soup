@@ -107,6 +107,14 @@ namespace Soup.Game
         public int GetJobCapacity(JobItem job)
         {
             if (job == null) return 0;
+
+            var progression = JobProgressionManager.Instance;
+            if (progression != null)
+            {
+                int capacity = progression.GetEffectiveMaxWorkers(job);
+                return capacity == int.MaxValue ? int.MaxValue : capacity;
+            }
+
             return job.HasWorkerLimit ? job.MaxWorkers : int.MaxValue;
         }
 
@@ -141,6 +149,10 @@ namespace Soup.Game
         public bool TryAssign(JobItem job, int amount = 1)
         {
             if (job == null || amount <= 0) return false;
+
+            var progression = JobProgressionManager.Instance;
+            if (progression != null && !progression.IsUnlocked(job))
+                return false;
 
             // Design: only one cook method (小火 / 中火 / 大火) at a time.
             // Switching transfers all workers from the previous cook station.

@@ -14,3 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startingElfCount: 10
   warehouseCapacity: 100
+  spicyMultiplierCap: 3

@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac898d106334b3f4781d12f8d5c79a54, type: 3}
+  m_Name: Relic_vegetarian_heart
+  m_EditorClassIdentifier: 
+  id: vegetarian_heart
+  displayName: "\u7D20\u658B\u4E4B\u5FC3"
+  description: "\u82E5\u672C\u56DE\u5408\u6CA1\u6709\u91C7\u96C6\u8089\u7C7B\u98DF\u6750\uFF0C\u6700\u7EC8\u500D\u7387
+    +0.6\u3002"
+  icon: {fileID: 0}
+  tint: {r: 1, g: 1, b: 1, a: 1}
+  acquireStage: 1
+  rules:
+  - trigger: 2
+    condition: 1
+    conditionCategory: 1
+    conditionInt: 0
+    effect: 0
+    floatValue: 0.6
+    intValue: 0
+    amount: 0
+    ingredient: {fileID: 0}
