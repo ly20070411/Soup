@@ -14,6 +14,38 @@ namespace Soup.Relics
         /// <summary>
         /// Every intValue gathered units → grant amount of ingredient (via yield resolver).
         /// </summary>
-        GrantIngredientPerGather = 3
+        GrantIngredientPerGather = 3,
+        /// <summary>Add amount to warehouse capacity bonus.</summary>
+        ModifyWarehouseCapacity = 4,
+        /// <summary>Add amount of raw material (Material field).</summary>
+        AddRawMaterial = 5,
+        /// <summary>Add amount processed food.</summary>
+        AddProcessed = 6,
+        /// <summary>Add floatValue to global work efficiency (Passive / TurnStart query).</summary>
+        AddGlobalLaborEfficiency = 7,
+        /// <summary>Add floatValue to a specific employee type efficiency (EmployeeTypeId).</summary>
+        AddEmployeeTypeLaborEfficiency = 8,
+        /// <summary>Multiply independent score zone by floatValue (starts at 1).</summary>
+        MultiplyIndependentScore = 9,
+        /// <summary>Add amount elves (negative removes).</summary>
+        ModifyElfCount = 10,
+        /// <summary>Acquire LinkedRelic once (e.g. 仪式 → 激励).</summary>
+        GrantLinkedRelic = 11,
+        /// <summary>
+        /// Every intValue units of Material produced this batch → grant amount more of same.
+        /// </summary>
+        GrantRawPerRawProduced = 12,
+        /// <summary>
+        /// Grant Soft = floor(previous unused warehouse × floatValue).
+        /// </summary>
+        GrantSoftFromUnusedWarehousePercent = 13,
+        /// <summary>
+        /// With probability floatValue, grant amount of a random raw material.
+        /// </summary>
+        ChanceGrantRandomRaw = 14,
+        /// <summary>
+        /// Passive: each lost elf grants amount ghosts (EmployeeTypeId defaults to ghost).
+        /// </summary>
+        GrantEmployeeOnElfLoss = 15
     }
 }

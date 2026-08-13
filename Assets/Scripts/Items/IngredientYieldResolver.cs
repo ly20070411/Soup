@@ -124,6 +124,7 @@ namespace Soup.Items
                         break;
                     case "随机效果":
                     case "随机口味":
+                    case "随机风味":
                     case "random_flavor":
                         yield.RandomFlavor += amount;
                         break;

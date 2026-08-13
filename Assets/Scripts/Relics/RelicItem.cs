@@ -21,7 +21,7 @@ namespace Soup.Relics
         [SerializeField] private Color tint = Color.white;
 
         [Header("Progression")]
-        [SerializeField] private RelicAcquireStage acquireStage = RelicAcquireStage.Stage1;
+        [SerializeField] private RelicAcquireStage acquireStage = RelicAcquireStage.Starting;
 
         [Header("Rules")]
         [SerializeField] private List<RelicRule> rules = new List<RelicRule>();
@@ -117,10 +117,8 @@ namespace Soup.Relics
         {
             switch (stage)
             {
-                case RelicAcquireStage.Stage1: return "阶段1";
-                case RelicAcquireStage.Stage2: return "阶段2";
-                case RelicAcquireStage.Stage3: return "阶段3";
-                case RelicAcquireStage.Stage4: return "阶段4";
+                case RelicAcquireStage.Starting: return "开局获取";
+                case RelicAcquireStage.Event: return "事件获取";
                 default: return stage.ToString();
             }
         }

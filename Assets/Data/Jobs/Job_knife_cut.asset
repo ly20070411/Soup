@@ -32,9 +32,10 @@ MonoBehaviour:
   sourPerGatherUnit: 0
   coldPerGatherUnit: 0
   magicPerGatherUnit: 0
-  processAmountPerWorker: 10
+  processAmountPerWorker: 100
   preferredMaterial: 0
   otherMaterialEfficiency: 0.5
   processRandom: 0
+  processPriority: 100
   cookAmountPerWorker: 10
   scoreMultiplier: 1

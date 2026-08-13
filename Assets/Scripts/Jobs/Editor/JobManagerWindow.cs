@@ -232,6 +232,9 @@ namespace Soup.Jobs.Editor
                         EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("preferredMaterial"), new GUIContent("优先材质"));
                         EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("otherMaterialEfficiency"), new GUIContent("其他材质效率"));
                         EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("processRandom"), new GUIContent("随机处理任意材质"));
+                        EditorGUILayout.PropertyField(
+                            _selectedSerialized.FindProperty("processPriority"),
+                            new GUIContent("结算优先级", "数值越大越先结算。爆炸应为 0（最低），刀切/电锯/钻头建议 100。"));
                         break;
                     case JobType.Cook:
                         EditorGUILayout.LabelField("烹饪效果", EditorStyles.boldLabel);

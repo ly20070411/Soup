@@ -1,13 +1,13 @@
 namespace Soup.Relics
 {
     /// <summary>
-    /// Game-progression stage when a relic can be offered / acquired.
+    /// How a relic enters the run.
     /// </summary>
     public enum RelicAcquireStage
     {
-        Stage1 = 1,
-        Stage2 = 2,
-        Stage3 = 3,
-        Stage4 = 4
+        /// <summary>Offered as a one-of-three pick at New Game start.</summary>
+        Starting = 0,
+        /// <summary>Granted by events (or similar rewards).</summary>
+        Event = 1
     }
 }

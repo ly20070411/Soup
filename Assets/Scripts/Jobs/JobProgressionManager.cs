@@ -96,6 +96,59 @@ namespace Soup.Jobs
             BootstrapDefaults();
         }
 
+        public void ApplyState(
+            IList<string> unlockedJobIds,
+            IList<string> upgradeJobIds,
+            IList<int> upgradeLevels,
+            IList<string> gatherOfferIds,
+            bool gatherStarterPicked,
+            bool processStarterPicked)
+        {
+            _unlocked.Clear();
+            _upgradeLevels.Clear();
+            _gatherOffer.Clear();
+            _gatherStarterPicked = gatherStarterPicked;
+            _processStarterPicked = processStarterPicked;
+
+            var jobs = JobManager.Instance;
+            if (jobs != null && unlockedJobIds != null)
+            {
+                for (int i = 0; i < unlockedJobIds.Count; i++)
+                {
+                    var job = jobs.GetById(unlockedJobIds[i]);
+                    if (job != null)
+                        _unlocked.Add(job);
+                }
+            }
+
+            if (jobs != null && upgradeJobIds != null && upgradeLevels != null)
+            {
+                int n = Mathf.Min(upgradeJobIds.Count, upgradeLevels.Count);
+                for (int i = 0; i < n; i++)
+                {
+                    if (string.IsNullOrEmpty(upgradeJobIds[i]) || upgradeLevels[i] <= 0)
+                        continue;
+                    var job = jobs.GetById(upgradeJobIds[i]);
+                    if (job == null) continue;
+                    _upgradeLevels[job] = upgradeLevels[i];
+                    if (job.JobType != JobType.Cook)
+                        _unlocked.Add(job);
+                }
+            }
+
+            if (jobs != null && gatherOfferIds != null)
+            {
+                for (int i = 0; i < gatherOfferIds.Count; i++)
+                {
+                    var job = jobs.GetById(gatherOfferIds[i]);
+                    if (job != null)
+                        _gatherOffer.Add(job);
+                }
+            }
+
+            BootstrapDefaults();
+        }
+
         public bool IsUnlocked(JobItem job) => job != null && _unlocked.Contains(job);
 
         public int GetUpgradeLevel(JobItem job)

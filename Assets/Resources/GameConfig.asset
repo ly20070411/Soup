@@ -13,5 +13,10 @@ MonoBehaviour:
   m_Name: GameConfig
   m_EditorClassIdentifier: 
   startingElfCount: 10
-  warehouseCapacity: 100
+  warehouseCapacity: 2000
   spicyMultiplierCap: 3
+  enableStageEndEvents: 1
+  stageEndEventCount: 2
+  enableTurnEndEvents: 1
+  turnEndEventChance: 0.898
+  eventCooldownTurns: 3

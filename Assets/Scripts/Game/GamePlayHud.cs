@@ -1,16 +1,19 @@
 using System.Collections.Generic;
+using Soup.Employees;
+using Soup.Events;
 using Soup.Jobs;
+using Soup.Levels;
 using Soup.Relics;
 using UnityEngine;
 
 namespace Soup.Game
 {
     /// <summary>
-    /// Prototype play HUD: resource panel, job assignment, next-turn button.
+    /// Control panel (relics / job unlock & advancement). Opened from overlay HUD.
     /// </summary>
     public class GamePlayHud : MonoBehaviour
     {
-        [SerializeField] private bool visible = true;
+        [SerializeField] private bool visible;
         [SerializeField] private KeyCode toggleKey = KeyCode.F1;
 
         private Vector2 _jobScroll;
@@ -18,52 +21,133 @@ namespace Soup.Game
         private Vector2 _progressScroll;
         private string _lastResult = string.Empty;
         private readonly List<JobItem> _jobsCache = new List<JobItem>();
-        private RelicAcquireStage _debugStage = RelicAcquireStage.Stage1;
+        private RelicAcquireStage _debugStage = RelicAcquireStage.Starting;
         private JobType _advanceType = JobType.Gather;
         private JobItem _gatherReplaceTarget;
         private GUIStyle _boldLabel;
+        private bool _valueEditOpen;
+        private string _editSoft = "0";
+        private string _editTough = "0";
+        private string _editSolid = "0";
+        private string _editSpicy = "0";
+        private string _editSour = "0";
+        private string _editCold = "0";
+        private string _editMagic = "0";
+        private string _editProcessed = "0";
+        private string _editCooked = "0";
+        private string _editTurn = "0";
+        private string _editScore = "0";
+        private string _editLastCooked = "0";
+        private string _editLastScore = "0";
+        private string _editElves = "0";
+        private bool _valueFieldsSynced;
+        private string _assignEmployeeTypeId = EmployeeManager.ElfId;
+
+        public bool IsPanelOpen => visible;
+
+        public void SetPanelMode(bool open)
+        {
+            visible = open;
+            if (open)
+                _valueFieldsSynced = false;
+        }
+
+        public void TogglePanelMode()
+        {
+            visible = !visible;
+            if (visible)
+                _valueFieldsSynced = false;
+        }
 
         private void OnEnable()
         {
             if (TurnManager.Instance != null)
+            {
                 TurnManager.Instance.TurnResolved += OnTurnResolved;
+                TurnManager.Instance.UndoApplied += OnUndoApplied;
+            }
         }
 
         private void OnDisable()
         {
             if (TurnManager.Instance != null)
+            {
                 TurnManager.Instance.TurnResolved -= OnTurnResolved;
+                TurnManager.Instance.UndoApplied -= OnUndoApplied;
+            }
         }
 
         private void Update()
         {
+            if (MainMenuUI.Instance != null && MainMenuUI.Instance.IsOpen)
+            {
+                if (visible)
+                    visible = false;
+                return;
+            }
+
             if (Input.GetKeyDown(toggleKey))
+            {
                 visible = !visible;
+                if (visible)
+                    _valueFieldsSynced = false;
+            }
+            else if (visible && Input.GetKeyDown(KeyCode.Escape))
+                visible = false;
         }
 
         private void OnTurnResolved(TurnResult result)
         {
             _lastResult = result != null ? result.ToString() : string.Empty;
+            _valueFieldsSynced = false;
+        }
+
+        private void OnUndoApplied()
+        {
+            _lastResult = "已撤回上一回合";
+            _valueFieldsSynced = false;
         }
 
         private void OnGUI()
         {
             if (!visible) return;
 
-            const float pad = 10f;
-            float width = Mathf.Min(920f, Screen.width - pad * 2f);
-            GUILayout.BeginArea(new Rect(pad, pad, width, Screen.height - pad * 2f));
+            // Dim background
+            var dim = new Color(0f, 0f, 0f, 0.55f);
+            GUI.color = dim;
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
 
+            // Large modal (~88% screen), not edge-to-edge.
+            float width = Mathf.Min(Screen.width * 0.88f, Screen.width - 64f);
+            float height = Mathf.Min(Screen.height * 0.88f, Screen.height - 64f);
+            var area = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            GUILayout.BeginArea(area, "box");
+
+            float relicH = Mathf.Clamp(height * 0.2f, 140f, 220f);
+            float progressH = Mathf.Clamp(height * 0.24f, 180f, 280f);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("操控面板（遗物 / 岗位进阶 / 分配）", BoldLabel());
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("关闭", GUILayout.Width(100f), GUILayout.Height(36f)))
+                visible = false;
+            GUILayout.EndHorizontal();
+            GUILayout.Label($"[{toggleKey}] 开关 · [Esc] 关闭");
+
+            GUILayout.Space(6f);
             DrawResourceBar();
-            GUILayout.Space(8f);
+            GUILayout.Space(6f);
             DrawControls();
-            GUILayout.Space(8f);
-            DrawRelicPanel();
-            GUILayout.Space(8f);
-            DrawJobProgressionPanel();
-            GUILayout.Space(8f);
+            GUILayout.Space(6f);
+            DrawValueTweaks();
+            GUILayout.Space(6f);
+            DrawRelicPanel(relicH);
+            GUILayout.Space(6f);
+            DrawJobProgressionPanel(progressH);
+            GUILayout.Space(6f);
             DrawJobPanel();
-            GUILayout.Space(8f);
+            GUILayout.Space(6f);
             DrawLastResult();
 
             GUILayout.EndArea();
@@ -111,37 +195,341 @@ namespace Soup.Game
                 Stat($"精灵 闲{elves.FreeCount}/总{elves.TotalCount}", -1);
             GUILayout.EndHorizontal();
 
+            DrawEmployeeSummaryRow();
+            DrawLevelSummaryRow(turns);
+
             GUILayout.EndVertical();
+        }
+
+        private void DrawLevelSummaryRow(TurnManager turns)
+        {
+            var levels = LevelManager.Instance;
+            if (levels != null && levels.HasLevels && levels.Current != null)
+            {
+                var level = levels.Current;
+                string status = levels.Outcome switch
+                {
+                    LevelOutcome.Won when levels.IsCampaignComplete => "全通关",
+                    LevelOutcome.Won => "已通关·结算中",
+                    LevelOutcome.Lost => "失败",
+                    _ => "进行中"
+                };
+
+                GUILayout.BeginHorizontal();
+                Stat($"关卡 {level.DisplayName}", -1);
+                Stat($"得分 {levels.ScoreGainedInLevel}/{level.TargetScore}", -1);
+                Stat($"回合 {levels.LevelTurnIndex}/{level.MaxTurns}", -1);
+                Stat($"[{status}]", -1);
+                GUILayout.EndHorizontal();
+
+                if (turns != null)
+                {
+                    GUILayout.BeginHorizontal();
+                    Stat("本关烹饪", turns.StageCooked);
+                    GUILayout.Label("酸涩在第 MaxTurns 回合结束后结算，结算分计入本关目标判定");
+                    GUILayout.EndHorizontal();
+                }
+
+                return;
+            }
+
+            if (turns == null) return;
+
+            GUILayout.BeginHorizontal();
+            Stat("阶段", turns.StageIndex);
+            Stat("本关烹饪", turns.StageCooked);
+            GUILayout.Label("酸涩仅在阶段结算时换分，不会在每回合烹饪时消失");
+            GUILayout.EndHorizontal();
+        }
+
+        private void DrawEmployeeSummaryRow()
+        {
+            var em = EmployeeManager.Instance;
+            if (em == null) return;
+
+            GUILayout.BeginHorizontal();
+            var mushroom = em.MushroomPersonType;
+            if (mushroom != null)
+            {
+                int n = em.GetOwned(mushroom);
+                if (n > 0 || mushroom.HasLockedJob)
+                    Stat($"蘑菇人 {n}（锁蘑菇岗）", -1);
+            }
+
+            var ghost = em.GhostType;
+            if (ghost != null)
+            {
+                int owned = em.GetOwned(ghost);
+                int free = em.GetFree(ghost);
+                if (owned > 0 || free > 0)
+                    Stat($"幽灵 闲{free}/总{owned}", -1);
+            }
+
+            GUILayout.EndHorizontal();
         }
 
         private void DrawControls()
         {
             GUILayout.BeginHorizontal();
+            var levels = LevelManager.Instance;
+            bool canTurn = levels == null || levels.CanAdvanceTurn;
+            GUI.enabled = canTurn;
             if (GUILayout.Button("下一回合", GUILayout.Height(36f), GUILayout.Width(120f)))
             {
                 if (TurnManager.Instance != null)
                     TurnManager.Instance.NextTurn();
             }
+            GUI.enabled = true;
+
+            GUI.enabled = TurnManager.Instance != null && TurnManager.Instance.CanUndo
+                && (levels == null || levels.Outcome != LevelOutcome.Lost);
+            if (GUILayout.Button("撤回上一回合", GUILayout.Height(36f), GUILayout.Width(130f)))
+            {
+                if (TurnManager.Instance != null && TurnManager.Instance.TryUndoPreviousTurn())
+                    _lastResult = "已撤回上一回合";
+            }
+            GUI.enabled = true;
+
+            bool canSettle = levels == null || !levels.HasLevels;
+            GUI.enabled = canSettle;
+            if (!levels?.HasLevels ?? true)
+            {
+                if (GUILayout.Button("大关结算", GUILayout.Height(36f), GUILayout.Width(100f)))
+                {
+                    if (TurnManager.Instance != null)
+                    {
+                        var settle = TurnManager.Instance.SettleStage();
+                        _lastResult = settle != null ? settle.ToString() : "大关已结算";
+                        _valueFieldsSynced = false;
+                    }
+                }
+            }
+            GUI.enabled = true;
 
             if (GUILayout.Button("重置局", GUILayout.Height(36f), GUILayout.Width(100f)))
             {
                 TurnManager.Instance?.ResetRun();
                 _gatherReplaceTarget = null;
                 _lastResult = "已重置";
+                _valueFieldsSynced = false;
             }
 
             if (GUILayout.Button("清空分配", GUILayout.Height(36f), GUILayout.Width(100f)))
                 ElfManager.Instance?.ClearAssignments();
 
+            if (GUILayout.Button("+蘑菇人", GUILayout.Height(36f), GUILayout.Width(80f)))
+            {
+                EmployeeManager.Instance?.Add(EmployeeManager.MushroomPersonId, 1);
+                _lastResult = "已添加 1 蘑菇人（锁定蘑菇岗）";
+                FindObjectOfType<JobWorldMap>()?.RefreshLabels();
+            }
+
+            if (GUILayout.Button("+幽灵", GUILayout.Height(36f), GUILayout.Width(70f)))
+            {
+                EmployeeManager.Instance?.Add(EmployeeManager.GhostId, 1);
+                _lastResult = "已添加 1 幽灵（不占岗，效率 0.8）";
+            }
+
+            if (GUILayout.Button("触发示例事件", GUILayout.Height(36f), GUILayout.Width(120f)))
+            {
+                var events = EventManager.Instance;
+                if (events == null)
+                    _lastResult = "EventManager 未就绪";
+                else if (events.HasPendingEvent)
+                    _lastResult = "已有待选事件";
+                else if (events.PresentById("more_hands") || events.Present(events.All.Count > 0 ? events.All[0] : null))
+                    _lastResult = $"已弹出事件：{events.PendingEvent.DisplayName}";
+                else
+                    _lastResult = "没有可弹出的事件（请先 Soup/Event Manager/Seed Sample Events）";
+            }
+
+            if (GUILayout.Button("关卡间", GUILayout.Height(36f), GUILayout.Width(100f)))
+            {
+                if (levels == null || !levels.HasLevels)
+                    _lastResult = "无关卡数据";
+                else if (levels.HasActiveClearRewards)
+                    _lastResult = "关卡间页面已打开";
+                else
+                {
+                    levels.DebugForceOpenClearRewards();
+                    _lastResult = "已打开关卡间页面（调试）";
+                    SetPanelMode(false);
+                }
+            }
+
             GUILayout.FlexibleSpace();
             GUILayout.Label($"[{toggleKey}] 显隐");
             GUILayout.EndHorizontal();
+
+            var eventMgr = EventManager.Instance;
+            if (eventMgr != null)
+            {
+                int cool = eventMgr.GetCooldownTurnsRemaining();
+                string coolText = eventMgr.EnableTurnEndEvents
+                    ? (cool > 0 ? $"冷却剩余 {cool} 回合" : "可随机触发")
+                    : "回合随机已关闭";
+                GUILayout.Label(
+                    $"族长的激励：{eventMgr.ChiefIncentive}   待选：{(eventMgr.HasPendingEvent ? eventMgr.PendingEvent.DisplayName : "无")}   {coolText}（间隔 {eventMgr.EventCooldownTurns} / 概率 {eventMgr.TurnEndEventChance:0.##}）");
+            }
         }
 
-        private void DrawRelicPanel()
+        private void DrawValueTweaks()
+        {
+            GUILayout.BeginVertical("box");
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("自由调整数值", BoldLabel());
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button(_valueEditOpen ? "收起" : "展开", GUILayout.Width(70f)))
+            {
+                _valueEditOpen = !_valueEditOpen;
+                if (_valueEditOpen)
+                    SyncValueFieldsFromState();
+            }
+            GUILayout.EndHorizontal();
+
+            if (!_valueEditOpen)
+            {
+                GUILayout.Label("展开后可直接改资源 / 回合 / 总分 / 精灵数");
+                GUILayout.EndVertical();
+                return;
+            }
+
+            if (!_valueFieldsSynced)
+                SyncValueFieldsFromState();
+
+            GUILayout.BeginHorizontal();
+            ValueField("柔软", ref _editSoft);
+            ValueField("强韧", ref _editTough);
+            ValueField("坚固", ref _editSolid);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            ValueField("热辣", ref _editSpicy);
+            ValueField("酸涩", ref _editSour);
+            ValueField("寒冷", ref _editCold);
+            ValueField("鲜美", ref _editMagic);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            ValueField("已处理", ref _editProcessed);
+            ValueField("已烹饪", ref _editCooked);
+            ValueField("精灵总数", ref _editElves);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            ValueField("回合", ref _editTurn);
+            ValueField("总分", ref _editScore);
+            ValueField("上回合烹饪", ref _editLastCooked);
+            ValueField("上回合得分", ref _editLastScore);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("从当前同步", GUILayout.Height(30f), GUILayout.Width(110f)))
+                SyncValueFieldsFromState();
+
+            if (GUILayout.Button("应用数值", GUILayout.Height(30f), GUILayout.Width(110f)))
+                ApplyEditedValues();
+
+            GUILayout.FlexibleSpace();
+            GUILayout.Label("应用后会清空「撤回上一回合」缓冲");
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+        }
+
+        private void SyncValueFieldsFromState()
+        {
+            var store = ResourceStore.Instance;
+            var turns = TurnManager.Instance;
+            var elves = ElfManager.Instance;
+
+            if (store != null)
+            {
+                _editSoft = store.Soft.ToString();
+                _editTough = store.Tough.ToString();
+                _editSolid = store.Solid.ToString();
+                _editSpicy = store.Spicy.ToString();
+                _editSour = store.Sour.ToString();
+                _editCold = store.Cold.ToString();
+                _editMagic = store.Magic.ToString();
+                _editProcessed = store.Processed.ToString();
+                _editCooked = store.Cooked.ToString();
+            }
+
+            if (turns != null)
+            {
+                _editTurn = turns.TurnIndex.ToString();
+                _editScore = turns.Score.ToString();
+                _editLastCooked = turns.LastTurnCooked.ToString();
+                _editLastScore = turns.LastTurnScore.ToString();
+            }
+
+            if (elves != null)
+                _editElves = elves.TotalCount.ToString();
+
+            _valueFieldsSynced = true;
+        }
+
+        private void ApplyEditedValues()
+        {
+            int soft = ParseNonNeg(_editSoft);
+            int tough = ParseNonNeg(_editTough);
+            int solid = ParseNonNeg(_editSolid);
+            int spicy = ParseNonNeg(_editSpicy);
+            int sour = ParseNonNeg(_editSour);
+            int cold = ParseNonNeg(_editCold);
+            int magic = ParseNonNeg(_editMagic);
+            int processed = ParseNonNeg(_editProcessed);
+            int cooked = ParseNonNeg(_editCooked);
+            int turn = ParseNonNeg(_editTurn);
+            int score = ParseNonNeg(_editScore);
+            int lastCooked = ParseNonNeg(_editLastCooked);
+            int lastScore = ParseNonNeg(_editLastScore);
+            int elves = ParseNonNeg(_editElves);
+
+            ResourceStore.Instance?.ApplyState(
+                soft, tough, solid,
+                spicy, sour, cold, magic,
+                processed, cooked);
+            TurnManager.Instance?.ApplyState(turn, score, lastCooked, lastScore);
+            ElfManager.Instance?.SetTotalCount(elves);
+            TurnManager.Instance?.ClearUndoSnapshot();
+
+            var map = FindObjectOfType<JobWorldMap>();
+            map?.RefreshLabels();
+
+            _lastResult =
+                $"已应用数值：回合 {turn} / 总分 {score} / 精灵 {elves} / " +
+                $"原料 {soft}+{tough}+{solid} / 处理 {processed} / 烹饪 {cooked}";
+            SyncValueFieldsFromState();
+        }
+
+        private static void ValueField(string label, ref string field)
+        {
+            GUILayout.BeginVertical(GUILayout.MinWidth(110f));
+            GUILayout.Label(label);
+            field = GUILayout.TextField(field ?? "0", GUILayout.Width(100f));
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("-", GUILayout.Width(28f)))
+                field = Mathf.Max(0, ParseNonNeg(field) - 1).ToString();
+            if (GUILayout.Button("+", GUILayout.Width(28f)))
+                field = (ParseNonNeg(field) + 1).ToString();
+            if (GUILayout.Button("+10", GUILayout.Width(36f)))
+                field = (ParseNonNeg(field) + 10).ToString();
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+        }
+
+        private static int ParseNonNeg(string text)
+        {
+            if (!int.TryParse(text, out int value))
+                return 0;
+            return Mathf.Max(0, value);
+        }
+
+        private void DrawRelicPanel(float panelHeight)
         {
             var relics = RelicManager.Instance;
-            GUILayout.BeginVertical("box", GUILayout.Height(150f));
+            GUILayout.BeginVertical("box", GUILayout.Height(panelHeight));
             GUILayout.Label("遗物（局内持有）", BoldLabel());
 
             if (relics == null)
@@ -153,13 +541,14 @@ namespace Soup.Game
 
             GUILayout.BeginHorizontal();
             GUILayout.Label("调试获取阶段:", GUILayout.Width(100f));
-            if (GUILayout.Button(RelicItem.StageLabel(_debugStage), GUILayout.Width(80f)))
+            if (GUILayout.Button(RelicItem.StageLabel(_debugStage), GUILayout.Width(100f)))
             {
-                int next = ((int)_debugStage % 4) + 1;
-                _debugStage = (RelicAcquireStage)next;
+                _debugStage = _debugStage == RelicAcquireStage.Starting
+                    ? RelicAcquireStage.Event
+                    : RelicAcquireStage.Starting;
             }
 
-            if (GUILayout.Button("获取该阶段全部", GUILayout.Width(120f)))
+            if (GUILayout.Button("获取该来源全部", GUILayout.Width(120f)))
             {
                 var list = relics.GetRelicsForStage(_debugStage);
                 int gained = 0;
@@ -169,18 +558,19 @@ namespace Soup.Game
                         gained++;
                 }
 
-                _lastResult = $"阶段 {RelicItem.StageLabel(_debugStage)} 新获取 {gained} 个遗物";
+                _lastResult = $"{RelicItem.StageLabel(_debugStage)} 新获取 {gained} 个遗物";
             }
 
             GUILayout.FlexibleSpace();
             GUILayout.Label($"持有 {relics.Owned.Count}");
             GUILayout.EndHorizontal();
 
-            _relicScroll = GUILayout.BeginScrollView(_relicScroll, GUILayout.Height(90f));
+            float scrollH = Mathf.Max(80f, panelHeight - 60f);
+            _relicScroll = GUILayout.BeginScrollView(_relicScroll, GUILayout.Height(scrollH));
 
             // Owned
             if (relics.Owned.Count == 0)
-                GUILayout.Label("（空）开局无遗物，用上方调试按钮按阶段获取。");
+                GUILayout.Label("（空）用上方调试按钮按来源获取。开局遗物在主菜单「开始游戏」时三选一。");
             else
             {
                 for (int i = 0; i < relics.Owned.Count; i++)
@@ -200,23 +590,21 @@ namespace Soup.Game
             GUILayout.Label($"可选（{RelicItem.StageLabel(_debugStage)}）", BoldLabel());
             var stageRelics = relics.GetRelicsForStage(_debugStage);
             if (stageRelics.Count == 0)
-                GUILayout.Label("该阶段暂无遗物。请在「Soup/遗物管理器」填充示例。");
+                GUILayout.Label("该来源暂无遗物。请在「Soup/遗物管理器」填充正式遗物。");
             else
             {
                 for (int i = 0; i < stageRelics.Count; i++)
                 {
                     var item = stageRelics[i];
                     if (item == null) continue;
-                    bool has = relics.Has(item);
+                    int stacks = relics.CountOwned(item);
                     GUILayout.BeginHorizontal();
                     GUILayout.Label($"{item.DisplayName}", GUILayout.Width(160f));
-                    GUI.enabled = !has;
-                    if (GUILayout.Button(has ? "已持有" : "获取", GUILayout.Width(60f)))
+                    if (GUILayout.Button(stacks > 0 ? $"再获取({stacks})" : "获取", GUILayout.Width(80f)))
                     {
                         if (relics.Acquire(item))
                             _lastResult = $"获得遗物：{item.DisplayName}";
                     }
-                    GUI.enabled = true;
                     GUILayout.Label(item.Description, GUILayout.MinWidth(200f));
                     GUILayout.EndHorizontal();
                 }
@@ -226,11 +614,11 @@ namespace Soup.Game
             GUILayout.EndVertical();
         }
 
-        private void DrawJobProgressionPanel()
+        private void DrawJobProgressionPanel(float panelHeight)
         {
             var progression = JobProgressionManager.Instance;
             var jobs = JobManager.Instance;
-            GUILayout.BeginVertical("box", GUILayout.Height(200f));
+            GUILayout.BeginVertical("box", GUILayout.Height(panelHeight));
             GUILayout.Label("岗位进阶", BoldLabel());
 
             if (progression == null || jobs == null)
@@ -252,11 +640,12 @@ namespace Soup.Game
                 progression.RefreshGatherOffer();
             GUILayout.EndHorizontal();
 
-            _progressScroll = GUILayout.BeginScrollView(_progressScroll, GUILayout.Height(150f));
+            float scrollH = Mathf.Max(120f, panelHeight - 50f);
+            _progressScroll = GUILayout.BeginScrollView(_progressScroll, GUILayout.Height(scrollH));
 
             if (progression.NeedsGatherStarterPick)
             {
-                GUILayout.Label("开局采集：蘑菇已解锁，请再选 1 个采集岗", BoldLabel());
+                GUILayout.Label("开局采集：应在主菜单二选一完成；此处可补选", BoldLabel());
                 DrawUnlockCandidates(progression.GetLocked(JobType.Gather), job =>
                 {
                     if (progression.TryPickGatherStarter(job))
@@ -266,7 +655,7 @@ namespace Soup.Game
 
             if (progression.NeedsProcessStarterPick)
             {
-                GUILayout.Label("开局处理：请选择 1 个处理岗", BoldLabel());
+                GUILayout.Label("开局处理：应在主菜单四选一完成；此处可补选", BoldLabel());
                 DrawUnlockCandidates(progression.GetLocked(JobType.Process), job =>
                 {
                     if (progression.TryPickProcessStarter(job))
@@ -433,6 +822,7 @@ namespace Soup.Game
         private void DrawJobPanel()
         {
             var elves = ElfManager.Instance;
+            var em = EmployeeManager.Instance;
             var jobs = JobManager.Instance;
             var progression = JobProgressionManager.Instance;
             if (elves == null || jobs == null)
@@ -445,25 +835,66 @@ namespace Soup.Game
 
             GUILayout.BeginVertical("box", GUILayout.ExpandHeight(true));
             GUILayout.Label("岗位分配（仅显示已解锁）");
+            DrawAssignTypePicker(em);
             _jobScroll = GUILayout.BeginScrollView(_jobScroll);
 
-            DrawJobGroup("采集", JobType.Gather, elves, progression);
-            DrawJobGroup("处理", JobType.Process, elves, progression);
+            DrawJobGroup("采集", JobType.Gather, elves, em, progression);
+            DrawJobGroup("处理", JobType.Process, elves, em, progression);
 
             var activeCook = elves.GetActiveCookJob();
             string cookTitle = activeCook != null
                 ? $"烹饪（当前：{activeCook.DisplayName}，三选一）"
                 : "烹饪（小火/中火/大火 三选一）";
-            DrawJobGroup(cookTitle, JobType.Cook, elves, progression);
+            DrawJobGroup(cookTitle, JobType.Cook, elves, em, progression);
 
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
         }
 
-        private void DrawJobGroup(string title, JobType type, ElfManager elves, JobProgressionManager progression)
+        private void DrawAssignTypePicker(EmployeeManager em)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("分配单位:", GUILayout.Width(70f));
+            if (em == null)
+            {
+                GUILayout.Label("EmployeeManager 未就绪");
+                GUILayout.EndHorizontal();
+                return;
+            }
+
+            for (int i = 0; i < em.All.Count; i++)
+            {
+                var type = em.All[i];
+                if (type == null || !type.CanPlayerAssign) continue;
+
+                int free = em.GetFree(type);
+                int owned = em.GetOwned(type);
+                bool selected = _assignEmployeeTypeId == type.Id;
+                string label = $"{type.DisplayName} 闲{free}/总{owned}";
+                if (selected)
+                    GUI.backgroundColor = new Color(0.55f, 0.75f, 1f);
+                if (GUILayout.Button(label, GUILayout.Height(26f), GUILayout.MinWidth(120f)))
+                    _assignEmployeeTypeId = type.Id;
+                GUI.backgroundColor = Color.white;
+            }
+
+            GUILayout.EndHorizontal();
+            GUILayout.Label("世界地图 +/- 仍只调小精灵；幽灵请在此选择后用岗位按钮分配。");
+        }
+
+        private void DrawJobGroup(
+            string title,
+            JobType type,
+            ElfManager elves,
+            EmployeeManager em,
+            JobProgressionManager progression)
         {
             GUILayout.Space(4f);
             GUILayout.Label(title, BoldLabel());
+
+            var assignType = em != null ? em.GetById(_assignEmployeeTypeId) : null;
+            if (assignType == null || !assignType.CanPlayerAssign)
+                assignType = em != null ? em.ElfType : null;
 
             for (int i = 0; i < _jobsCache.Count; i++)
             {
@@ -471,7 +902,9 @@ namespace Soup.Game
                 if (job == null || job.JobType != type) continue;
                 if (progression != null && !progression.IsUnlocked(job)) continue;
 
-                int assigned = elves.GetAssigned(job);
+                int occupying = elves.GetAssigned(job);
+                float labor = em != null ? em.GetLaborOnJob(job) : occupying;
+                int typeAssigned = em != null && assignType != null ? em.GetAssigned(assignType, job) : 0;
                 int remain = elves.GetRemainingCapacity(job);
                 int capacity = elves.GetJobCapacity(job);
                 string cap = capacity == int.MaxValue ? "∞" : capacity.ToString();
@@ -482,17 +915,29 @@ namespace Soup.Game
                 var activeCook = isCook ? elves.GetActiveCookJob() : null;
                 bool otherCookActive = isCook && activeCook != null && !ReferenceEquals(activeCook, job);
 
-                GUILayout.BeginHorizontal();
-                string mark = otherCookActive ? "·" : (isCook && assigned > 0 ? "✓" : " ");
-                GUILayout.Label($"{mark} {job.DisplayName}{levelLabel}  {assigned}/{cap}", GUILayout.Width(250f));
-                GUILayout.Label(job.GetEffectSummary(), GUILayout.MinWidth(240f));
+                int free = assignType != null && em != null ? em.GetFree(assignType) : 0;
+                int fromOtherCook = 0;
+                if (otherCookActive && em != null && assignType != null)
+                    fromOtherCook = em.GetAssigned(assignType, activeCook);
 
-                GUI.enabled = assigned > 0;
+                bool canPlus = assignType != null && (
+                    (otherCookActive && fromOtherCook > 0) ||
+                    (free > 0 && (assignType.OccupiesJobSlot ? remain > 0 || remain == int.MaxValue : true)));
+
+                GUILayout.BeginHorizontal();
+                string mark = otherCookActive ? "·" : (isCook && occupying > 0 ? "✓" : " ");
+                string laborTag = Mathf.Abs(labor - occupying) > 0.01f ? $" 劳{labor:0.##}" : string.Empty;
+                GUILayout.Label(
+                    $"{mark} {job.DisplayName}{levelLabel}  占{occupying}/{cap}{laborTag}  本类{typeAssigned}",
+                    GUILayout.Width(320f));
+                GUILayout.Label(job.GetEffectSummary(), GUILayout.MinWidth(200f));
+
+                GUI.enabled = typeAssigned > 0;
                 if (GUILayout.Button("-", GUILayout.Width(28f)))
-                    elves.TryUnassign(job, 1);
-                GUI.enabled = remain > 0 && (elves.FreeCount > 0 || otherCookActive);
+                    em?.TryUnassign(assignType, job, 1);
+                GUI.enabled = canPlus;
                 if (GUILayout.Button(otherCookActive ? "选" : "+", GUILayout.Width(28f)))
-                    elves.TryAssign(job, 1);
+                    em?.TryAssign(assignType, job, 1);
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
             }

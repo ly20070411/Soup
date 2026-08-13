@@ -49,6 +49,8 @@ namespace Soup.Jobs
         [SerializeField, Range(0f, 1f)] private float otherMaterialEfficiency = 0.5f;
         [Tooltip("If true, randomly process any materials (e.g. Explosion).")]
         [SerializeField] private bool processRandom;
+        [Tooltip("处理结算优先级：数值越大越先结算。爆炸应为最低（0），刀切/电锯/钻头更高。")]
+        [SerializeField] private int processPriority = 100;
 
         [Header("Cook")]
         [SerializeField, Min(0)] private int cookAmountPerWorker = 10;
@@ -78,6 +80,7 @@ namespace Soup.Jobs
         public IngredientMaterial PreferredMaterial => preferredMaterial;
         public float OtherMaterialEfficiency => otherMaterialEfficiency;
         public bool ProcessRandom => processRandom;
+        public int ProcessPriority => processPriority;
 
         public int CookAmountPerWorker => cookAmountPerWorker;
         public float ScoreMultiplier => scoreMultiplier;
@@ -199,14 +202,18 @@ namespace Soup.Jobs
             int amountPerWorker,
             IngredientMaterial preferred,
             float otherEfficiency = 0.5f,
-            bool random = false)
+            bool random = false,
+            int priority = 100)
         {
             jobType = JobType.Process;
             processAmountPerWorker = Mathf.Max(0, amountPerWorker);
             preferredMaterial = preferred;
             otherMaterialEfficiency = Mathf.Clamp01(otherEfficiency);
             processRandom = random;
+            processPriority = priority;
         }
+
+        public void SetProcessPriority(int priority) => processPriority = priority;
 
         public void SetCook(int amountPerWorker, float multiplier)
         {
@@ -232,8 +239,8 @@ namespace Soup.Jobs
                 }
                 case JobType.Process:
                     if (processRandom || preferredMaterial == IngredientMaterial.Any)
-                        return $"处理任意 {processAmountPerWorker} 份食材，优先其他岗位难处理材质";
-                    return $"优先处理 {processAmountPerWorker} 份{MaterialLabel(preferredMaterial)}食材，其他材质效率 {otherMaterialEfficiency:0.##}";
+                        return $"处理任意 {processAmountPerWorker} 份食材（结算优先级最低 {processPriority}）";
+                    return $"优先处理 {processAmountPerWorker} 份{MaterialLabel(preferredMaterial)}食材，其他材质效率 {otherMaterialEfficiency:0.##}（优先级 {processPriority}）";
                 case JobType.Cook:
                     return $"烹饪 {cookAmountPerWorker} 份处理食材，分数倍率 {scoreMultiplier:0.##}";
                 default:

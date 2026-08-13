@@ -9,7 +9,7 @@ namespace Soup.Jobs
         public const int DefaultUpgradeWorkerBonus = 5;
 
         public const int GatherMaxStations = 4;
-        public const int ProcessMaxStations = 2;
+        public const int ProcessMaxStations = 4;
 
         public const int GatherMaxUpgradesPerJob = 2;
         public const int ProcessMaxUpgradesPerJob = 2;

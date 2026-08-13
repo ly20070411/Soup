@@ -72,9 +72,9 @@ namespace Soup.Relics.Editor
                 if (GUILayout.Button("扫描并同步", EditorStyles.toolbarButton, GUILayout.Width(90)))
                     ScanAndSync();
 
-                if (GUILayout.Button("填充示例", EditorStyles.toolbarButton, GUILayout.Width(70)))
+                if (GUILayout.Button("填充正式遗物", EditorStyles.toolbarButton, GUILayout.Width(100)))
                 {
-                    RelicDataSeeder.SeedSamples(openWindow: false);
+                    RelicDataSeeder.SeedAll(openWindow: false);
                     LoadOrCreateDatabase();
                 }
 
@@ -219,10 +219,8 @@ namespace Soup.Relics.Editor
         {
             switch (stage)
             {
-                case RelicAcquireStage.Stage1: return new Color(0.25f, 0.55f, 0.30f, 0.8f);
-                case RelicAcquireStage.Stage2: return new Color(0.55f, 0.40f, 0.20f, 0.8f);
-                case RelicAcquireStage.Stage3: return new Color(0.30f, 0.35f, 0.70f, 0.8f);
-                case RelicAcquireStage.Stage4: return new Color(0.70f, 0.25f, 0.35f, 0.8f);
+                case RelicAcquireStage.Starting: return new Color(0.25f, 0.55f, 0.30f, 0.8f);
+                case RelicAcquireStage.Event: return new Color(0.30f, 0.35f, 0.70f, 0.8f);
                 default: return new Color(0.2f, 0.2f, 0.2f, 0.5f);
             }
         }

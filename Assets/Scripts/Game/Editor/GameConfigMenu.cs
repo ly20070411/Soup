@@ -20,7 +20,7 @@ namespace Soup.Game.Editor
             {
                 config = ScriptableObject.CreateInstance<GameConfig>();
                 config.SetStartingElfCount(10);
-                config.SetWarehouseCapacity(100);
+                config.SetWarehouseCapacity(1000);
                 AssetDatabase.CreateAsset(config, ConfigPath);
                 AssetDatabase.SaveAssets();
                 Debug.Log("[游戏配置] 已创建: " + ConfigPath);

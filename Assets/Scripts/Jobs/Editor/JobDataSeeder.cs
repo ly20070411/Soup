@@ -40,6 +40,13 @@ namespace Soup.Jobs.Editor
             // Gather — 岗位名即产出食材名，按显示名关联物品管理器中的食材
             CreateGather(db, ingredients, "mushroom", "蘑菇", "采集蘑菇。", 5,
                 IngredientMaterial.Soft, 2);
+            // 蘑菇变种：岗位容量 / 采集量 / 进阶与基础蘑菇岗相同
+            CreateGather(db, ingredients, "mutant_mushroom", "变异蘑菇", "采集变异蘑菇。", 5,
+                IngredientMaterial.Soft, 2);
+            CreateGather(db, ingredients, "fat_mushroom", "肥大蘑菇", "采集肥大蘑菇。", 5,
+                IngredientMaterial.Soft, 2);
+            CreateGather(db, ingredients, "strange_mushroom", "奇异蘑菇", "采集奇异蘑菇。", 5,
+                IngredientMaterial.Soft, 2);
             CreateGather(db, ingredients, "berry", "小甜果", "采集小甜果。", 5,
                 IngredientMaterial.Soft, 1);
             CreateGather(db, ingredients, "ice_fruit", "冰晶果", "采集冰晶果。", 2,
@@ -61,13 +68,14 @@ namespace Soup.Jobs.Editor
 
             // Process
             CreateProcess(db, "knife_cut", "刀切", "优先处理柔软食材，其他材质效率减半。",
-                10, IngredientMaterial.Soft, 0.5f, false);
+                10, IngredientMaterial.Soft, 0.5f, false, 100);
             CreateProcess(db, "chainsaw", "电锯", "优先处理强韧食材，其他材质效率减半。",
-                10, IngredientMaterial.Tough, 0.5f, false);
+                10, IngredientMaterial.Tough, 0.5f, false, 100);
             CreateProcess(db, "drill", "钻头", "优先处理坚固食材，其他材质效率减半。",
-                10, IngredientMaterial.Solid, 0.5f, false);
-            CreateProcess(db, "explosion", "爆炸", "处理任意食材（每精灵 8 份），优先处理其他岗位难以处理的材质。",
-                8, IngredientMaterial.Any, 1f, true);
+                10, IngredientMaterial.Solid, 0.5f, false, 100);
+            CreateProcess(db, "explosion", "爆炸",
+                "处理任意食材（每精灵 8 份）：每份从柔软/强韧/坚固中随机选择。结算优先级最低，专精处理岗先吃料。",
+                8, IngredientMaterial.Any, 1f, true, 0);
 
             // Cook (unlimited workers)
             CreateCook(db, "low_heat", "小火", "小火慢炖，满分倍率。", 10, 1.0f);
@@ -198,12 +206,13 @@ namespace Soup.Jobs.Editor
             int amountPerWorker,
             IngredientMaterial preferred,
             float otherEfficiency,
-            bool random)
+            bool random,
+            int processPriority = 100)
         {
             var item = GetOrCreate(db, id, displayName);
             item.SetDescription(description);
             item.SetMaxWorkers(DefaultProcessMaxWorkers);
-            item.SetProcess(amountPerWorker, preferred, otherEfficiency, random);
+            item.SetProcess(amountPerWorker, preferred, otherEfficiency, random, processPriority);
             item.SeedDefaultUpgradeTiers();
             EditorUtility.SetDirty(item);
             db.Add(item);

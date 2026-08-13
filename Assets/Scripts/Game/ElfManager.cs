@@ -1,11 +1,13 @@
 using System.Collections.Generic;
+using Soup.Employees;
 using Soup.Jobs;
 using UnityEngine;
 
 namespace Soup.Game
 {
     /// <summary>
-    /// Runtime elf pool: total count, free count, and per-job assignments.
+    /// Compatibility facade over EmployeeManager for the default 小精灵 pool,
+    /// plus occupying-slot helpers used by station UI / capacity checks.
     /// </summary>
     [DefaultExecutionOrder(-90)]
     public class ElfManager : MonoBehaviour
@@ -15,30 +17,21 @@ namespace Soup.Game
         [SerializeField] private GameConfig config;
         [SerializeField] private bool dontDestroyOnLoad = true;
 
-        private int _totalCount;
-        private readonly Dictionary<JobItem, int> _assignments = new Dictionary<JobItem, int>();
-
         public static ElfManager Instance { get; private set; }
 
         public GameConfig Config => config;
 
+        private EmployeeManager Em => EmployeeManager.Instance;
+        private EmployeeItem Elf => Em != null ? Em.ElfType : null;
+
         /// <summary>小精灵总数。</summary>
-        public int TotalCount => _totalCount;
+        public int TotalCount => Em != null ? Em.GetOwned(EmployeeManager.ElfId) : 0;
 
         /// <summary>已分配到岗位的小精灵数量。</summary>
-        public int AssignedCount
-        {
-            get
-            {
-                int sum = 0;
-                foreach (var pair in _assignments)
-                    sum += pair.Value;
-                return sum;
-            }
-        }
+        public int AssignedCount => Em != null && Elf != null ? Em.GetAssignedTotal(Elf) : 0;
 
         /// <summary>尚未分配的空闲小精灵数量。</summary>
-        public int FreeCount => Mathf.Max(0, _totalCount - AssignedCount);
+        public int FreeCount => Em != null && Elf != null ? Em.GetFree(Elf) : 0;
 
         public static void Initialize(GameConfig gameConfig)
         {
@@ -51,7 +44,8 @@ namespace Soup.Game
             }
 
             Instance.config = gameConfig;
-            Instance.ResetFromConfig();
+            if (EmployeeManager.Instance != null)
+                EmployeeManager.Instance.ResetFromConfig();
         }
 
         private void Awake()
@@ -68,8 +62,6 @@ namespace Soup.Game
 
             if (config == null)
                 config = Resources.Load<GameConfig>(ResourcesConfigPath);
-
-            ResetFromConfig();
         }
 
         private void OnDestroy()
@@ -80,66 +72,53 @@ namespace Soup.Game
 
         public void ResetFromConfig()
         {
-            _assignments.Clear();
-            _totalCount = config != null ? Mathf.Max(0, config.StartingElfCount) : 0;
+            Em?.ResetFromConfig();
         }
 
         public void SetTotalCount(int value)
         {
-            _totalCount = Mathf.Max(0, value);
-            ClampAssignmentsToCapacity();
+            Em?.SetOwned(EmployeeManager.ElfId, value);
         }
 
         public void AddElves(int amount)
         {
-            if (amount == 0) return;
-            _totalCount = Mathf.Max(0, _totalCount + amount);
-            if (amount < 0)
-                ClampAssignmentsToCapacity();
+            Em?.Add(EmployeeManager.ElfId, amount);
         }
 
+        /// <summary>Occupying workers on this job (elves + mushroom people, etc.).</summary>
         public int GetAssigned(JobItem job)
         {
-            if (job == null) return 0;
-            return _assignments.TryGetValue(job, out var count) ? count : 0;
+            return Em != null ? Em.GetOccupyingOnJob(job) : 0;
         }
 
         public int GetJobCapacity(JobItem job)
         {
-            if (job == null) return 0;
-
-            var progression = JobProgressionManager.Instance;
-            if (progression != null)
-            {
-                int capacity = progression.GetEffectiveMaxWorkers(job);
-                return capacity == int.MaxValue ? int.MaxValue : capacity;
-            }
-
-            return job.HasWorkerLimit ? job.MaxWorkers : int.MaxValue;
+            return Em != null ? Em.GetJobCapacity(job) : (job != null && job.HasWorkerLimit ? job.MaxWorkers : int.MaxValue);
         }
 
         public int GetRemainingCapacity(JobItem job)
         {
             if (job == null) return 0;
+            if (Em == null) return 0;
+
             int capacity = GetJobCapacity(job);
             if (capacity == int.MaxValue)
             {
-                // Cook stations are mutually exclusive: switching frees other cook workers.
                 int free = FreeCount;
                 if (job.JobType == JobType.Cook)
-                    free += CountAssignedToOtherCooks(job);
+                    free += CountAssignedElvesToOtherCooks(job);
                 return free;
             }
 
-            return Mathf.Max(0, capacity - GetAssigned(job));
+            return Em.GetRemainingOccupyingCapacity(job);
         }
 
-        /// <summary>Currently selected cook job, or null if none.</summary>
         public JobItem GetActiveCookJob()
         {
-            foreach (var pair in _assignments)
+            if (Em == null) return null;
+            foreach (var pair in Em.GetLaborByJob())
             {
-                if (pair.Key != null && pair.Key.JobType == JobType.Cook && pair.Value > 0)
+                if (pair.Key != null && pair.Key.JobType == JobType.Cook && pair.Value > 0f)
                     return pair.Key;
             }
 
@@ -148,120 +127,112 @@ namespace Soup.Game
 
         public bool TryAssign(JobItem job, int amount = 1)
         {
-            if (job == null || amount <= 0) return false;
-
-            var progression = JobProgressionManager.Instance;
-            if (progression != null && !progression.IsUnlocked(job))
-                return false;
-
-            // Design: only one cook method (小火 / 中火 / 大火) at a time.
-            // Switching transfers all workers from the previous cook station.
-            if (job.JobType == JobType.Cook)
-            {
-                int fromOther = CountAssignedToOtherCooks(job);
-                if (fromOther > 0)
-                {
-                    ClearOtherCookAssignments(job);
-                    _assignments[job] = GetAssigned(job) + fromOther;
-                    return true;
-                }
-            }
-
-            if (amount > FreeCount) return false;
-
-            int capacity = GetJobCapacity(job);
-            if (capacity != int.MaxValue && GetAssigned(job) + amount > capacity)
-                return false;
-
-            _assignments[job] = GetAssigned(job) + amount;
-            return true;
+            if (Em == null || Elf == null) return false;
+            return Em.TryAssign(Elf, job, amount);
         }
 
         public bool TryUnassign(JobItem job, int amount = 1)
         {
-            if (job == null || amount <= 0) return false;
-
-            int current = GetAssigned(job);
-            if (current <= 0) return false;
-
-            int remove = Mathf.Min(amount, current);
-            int next = current - remove;
-            if (next <= 0)
-                _assignments.Remove(job);
-            else
-                _assignments[job] = next;
-
-            return true;
+            if (Em == null || Elf == null) return false;
+            return Em.TryUnassign(Elf, job, amount);
         }
 
         public void ClearAssignments()
         {
-            _assignments.Clear();
+            Em?.ClearPlayerAssignments();
         }
 
+        /// <summary>
+        /// Occupying headcount by job (for UI). Prefer <see cref="EmployeeManager.GetLaborByJob"/> for production.
+        /// </summary>
         public IReadOnlyDictionary<JobItem, int> GetAssignments()
         {
-            return _assignments;
+            var map = new Dictionary<JobItem, int>();
+            if (Em == null) return map;
+            foreach (var pair in Em.GetLaborByJob())
+            {
+                int occupying = Em.GetOccupyingOnJob(pair.Key);
+                if (occupying > 0)
+                    map[pair.Key] = occupying;
+                else if (pair.Value > 0f)
+                    map[pair.Key] = GameMath.CeilToInt(pair.Value);
+            }
+
+            return map;
         }
 
-        private void ClampAssignmentsToCapacity()
+        public void ApplyState(int totalElves, IList<string> jobIds, IList<int> counts)
         {
-            if (_assignments.Count == 0) return;
-
-            var keys = new List<JobItem>(_assignments.Keys);
-            int over = AssignedCount - _totalCount;
-            if (over <= 0)
-            {
-                foreach (var job in keys)
-                {
-                    int capacity = GetJobCapacity(job);
-                    if (capacity == int.MaxValue) continue;
-                    int assigned = _assignments[job];
-                    if (assigned > capacity)
-                        _assignments[job] = capacity;
-                }
+            if (Em == null)
                 return;
+
+            // Preserve non-elf ownership; rebuild elf assignments from save.
+            var ownedTypes = new List<string>();
+            var ownedCounts = new List<int>();
+            Em.CaptureOwned(ownedTypes, ownedCounts);
+
+            // Force elf count from save.
+            bool foundElf = false;
+            for (int i = 0; i < ownedTypes.Count; i++)
+            {
+                if (ownedTypes[i] == EmployeeManager.ElfId)
+                {
+                    ownedCounts[i] = Mathf.Max(0, totalElves);
+                    foundElf = true;
+                    break;
+                }
             }
 
-            // Trim overflow from the end of the assignment list when total shrinks.
-            for (int i = keys.Count - 1; i >= 0 && over > 0; i--)
+            if (!foundElf && totalElves > 0)
             {
-                var job = keys[i];
-                int assigned = _assignments[job];
-                int cut = Mathf.Min(assigned, over);
-                int next = assigned - cut;
-                over -= cut;
-                if (next <= 0)
-                    _assignments.Remove(job);
-                else
-                    _assignments[job] = next;
+                ownedTypes.Add(EmployeeManager.ElfId);
+                ownedCounts.Add(totalElves);
             }
+
+            var assignTypes = new List<string>();
+            var assignJobs = new List<string>();
+            var assignCounts = new List<int>();
+
+            // Keep non-elf player assignments (e.g. ghosts).
+            var keepTypes = new List<string>();
+            var keepJobs = new List<string>();
+            var keepCounts = new List<int>();
+            Em.CaptureAssignments(keepTypes, keepJobs, keepCounts);
+            for (int i = 0; i < keepTypes.Count; i++)
+            {
+                if (keepTypes[i] == EmployeeManager.ElfId) continue;
+                assignTypes.Add(keepTypes[i]);
+                assignJobs.Add(keepJobs[i]);
+                assignCounts.Add(keepCounts[i]);
+            }
+
+            if (jobIds != null && counts != null)
+            {
+                int n = Mathf.Min(jobIds.Count, counts.Count);
+                for (int i = 0; i < n; i++)
+                {
+                    if (string.IsNullOrEmpty(jobIds[i]) || counts[i] <= 0) continue;
+                    assignTypes.Add(EmployeeManager.ElfId);
+                    assignJobs.Add(jobIds[i]);
+                    assignCounts.Add(counts[i]);
+                }
+            }
+
+            Em.ApplyState(ownedTypes, ownedCounts, assignTypes, assignJobs, assignCounts);
         }
 
-        private int CountAssignedToOtherCooks(JobItem keep)
+        private int CountAssignedElvesToOtherCooks(JobItem keep)
         {
+            if (Em == null || Elf == null) return 0;
             int sum = 0;
-            foreach (var pair in _assignments)
+            foreach (var pair in Em.GetLaborByJob())
             {
                 if (pair.Key == null || pair.Key.JobType != JobType.Cook) continue;
                 if (keep != null && ReferenceEquals(pair.Key, keep)) continue;
-                sum += pair.Value;
+                sum += Em.GetAssigned(Elf, pair.Key);
             }
+
             return sum;
-        }
-
-        private void ClearOtherCookAssignments(JobItem keep)
-        {
-            if (_assignments.Count == 0) return;
-
-            var keys = new List<JobItem>(_assignments.Keys);
-            for (int i = 0; i < keys.Count; i++)
-            {
-                var job = keys[i];
-                if (job == null || job.JobType != JobType.Cook) continue;
-                if (keep != null && ReferenceEquals(job, keep)) continue;
-                _assignments.Remove(job);
-            }
         }
     }
 }

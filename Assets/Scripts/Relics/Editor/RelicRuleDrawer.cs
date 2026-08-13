@@ -1,4 +1,5 @@
 using Soup.Items;
+using Soup.Jobs;
 using UnityEditor;
 using UnityEngine;
 
@@ -44,11 +45,15 @@ namespace Soup.Relics.Editor
             var condition = property.FindPropertyRelative("condition");
             var conditionCategory = property.FindPropertyRelative("conditionCategory");
             var conditionInt = property.FindPropertyRelative("conditionInt");
+            var conditionIntMax = property.FindPropertyRelative("conditionIntMax");
             var effect = property.FindPropertyRelative("effect");
             var floatValue = property.FindPropertyRelative("floatValue");
             var intValue = property.FindPropertyRelative("intValue");
             var amount = property.FindPropertyRelative("amount");
             var ingredient = property.FindPropertyRelative("ingredient");
+            var material = property.FindPropertyRelative("material");
+            var employeeTypeId = property.FindPropertyRelative("employeeTypeId");
+            var linkedRelic = property.FindPropertyRelative("linkedRelic");
 
             y = DrawProp(position.x, y, w, trigger, "触发时机");
             y = DrawProp(position.x, y, w, condition, "条件");
@@ -58,6 +63,13 @@ namespace Soup.Relics.Editor
                 y = DrawProp(position.x, y, w, conditionCategory, "食材分类");
             else if (condType == RelicConditionType.HasFlavorCountAtLeast)
                 y = DrawProp(position.x, y, w, conditionInt, "风味种类下限");
+            else if (condType == RelicConditionType.HasFlavorCountAtMost)
+                y = DrawProp(position.x, y, w, conditionInt, "风味种类上限");
+            else if (condType == RelicConditionType.TurnIndexInRange)
+            {
+                y = DrawProp(position.x, y, w, conditionInt, "回合下限");
+                y = DrawProp(position.x, y, w, conditionIntMax, "回合上限");
+            }
 
             y = DrawProp(position.x, y, w, effect, "效果");
 
@@ -66,12 +78,46 @@ namespace Soup.Relics.Editor
             {
                 case RelicEffectType.AddFinalMultiplier:
                 case RelicEffectType.AddFinalMultiplierPerPresentFlavor:
-                    y = DrawProp(position.x, y, w, floatValue, "倍率增量");
+                case RelicEffectType.AddGlobalLaborEfficiency:
+                case RelicEffectType.MultiplyIndependentScore:
+                    y = DrawProp(position.x, y, w, floatValue, "数值");
+                    break;
+                case RelicEffectType.AddEmployeeTypeLaborEfficiency:
+                    y = DrawProp(position.x, y, w, floatValue, "效率增量");
+                    y = DrawProp(position.x, y, w, employeeTypeId, "员工类型Id");
                     break;
                 case RelicEffectType.GrantIngredientPerGather:
                     y = DrawProp(position.x, y, w, intValue, "每采集份数");
                     y = DrawProp(position.x, y, w, amount, "产出份数");
                     y = DrawProp(position.x, y, w, ingredient, "产出食材");
+                    break;
+                case RelicEffectType.ModifyWarehouseCapacity:
+                case RelicEffectType.AddProcessed:
+                case RelicEffectType.ModifyElfCount:
+                    y = DrawProp(position.x, y, w, amount, "数量");
+                    break;
+                case RelicEffectType.AddRawMaterial:
+                    y = DrawProp(position.x, y, w, material, "材质");
+                    y = DrawProp(position.x, y, w, amount, "数量");
+                    break;
+                case RelicEffectType.GrantLinkedRelic:
+                    y = DrawProp(position.x, y, w, linkedRelic, "授予遗物");
+                    break;
+                case RelicEffectType.GrantRawPerRawProduced:
+                    y = DrawProp(position.x, y, w, material, "材质");
+                    y = DrawProp(position.x, y, w, intValue, "每生产份数");
+                    y = DrawProp(position.x, y, w, amount, "额外产出");
+                    break;
+                case RelicEffectType.GrantSoftFromUnusedWarehousePercent:
+                    y = DrawProp(position.x, y, w, floatValue, "仓库空位比例");
+                    break;
+                case RelicEffectType.ChanceGrantRandomRaw:
+                    y = DrawProp(position.x, y, w, floatValue, "概率");
+                    y = DrawProp(position.x, y, w, amount, "数量");
+                    break;
+                case RelicEffectType.GrantEmployeeOnElfLoss:
+                    y = DrawProp(position.x, y, w, amount, "每损失授予数量");
+                    y = DrawProp(position.x, y, w, employeeTypeId, "员工类型Id");
                     break;
             }
 
@@ -97,7 +143,10 @@ namespace Soup.Relics.Editor
             {
                 case RelicConditionType.NoCategoryGathered:
                 case RelicConditionType.HasFlavorCountAtLeast:
+                case RelicConditionType.HasFlavorCountAtMost:
                     return 1;
+                case RelicConditionType.TurnIndexInRange:
+                    return 2;
                 default:
                     return 0;
             }
@@ -111,8 +160,21 @@ namespace Soup.Relics.Editor
             {
                 case RelicEffectType.AddFinalMultiplier:
                 case RelicEffectType.AddFinalMultiplierPerPresentFlavor:
+                case RelicEffectType.AddGlobalLaborEfficiency:
+                case RelicEffectType.MultiplyIndependentScore:
+                case RelicEffectType.ModifyWarehouseCapacity:
+                case RelicEffectType.AddProcessed:
+                case RelicEffectType.ModifyElfCount:
+                case RelicEffectType.GrantLinkedRelic:
+                case RelicEffectType.GrantSoftFromUnusedWarehousePercent:
                     return 1;
+                case RelicEffectType.AddEmployeeTypeLaborEfficiency:
+                case RelicEffectType.AddRawMaterial:
+                case RelicEffectType.ChanceGrantRandomRaw:
+                case RelicEffectType.GrantEmployeeOnElfLoss:
+                    return 2;
                 case RelicEffectType.GrantIngredientPerGather:
+                case RelicEffectType.GrantRawPerRawProduced:
                     return 3;
                 default:
                     return 0;
@@ -121,58 +183,10 @@ namespace Soup.Relics.Editor
 
         private static string BuildHeader(SerializedProperty property)
         {
+            // Best-effort header; full summaries live on RelicRule.ToSummary at runtime.
             var trigger = (RelicTrigger)property.FindPropertyRelative("trigger").intValue;
-            var condition = (RelicConditionType)property.FindPropertyRelative("condition").intValue;
             var effect = (RelicEffectType)property.FindPropertyRelative("effect").intValue;
-            var category = (IngredientCategory)property.FindPropertyRelative("conditionCategory").intValue;
-            int conditionInt = property.FindPropertyRelative("conditionInt").intValue;
-            float floatValue = property.FindPropertyRelative("floatValue").floatValue;
-            int intValue = property.FindPropertyRelative("intValue").intValue;
-            int amount = property.FindPropertyRelative("amount").intValue;
-            var ingredientProp = property.FindPropertyRelative("ingredient");
-            var ingredient = ingredientProp.objectReferenceValue as IngredientItem;
-
-            string cond;
-            switch (condition)
-            {
-                case RelicConditionType.Always:
-                    cond = "始终";
-                    break;
-                case RelicConditionType.NoCategoryGathered:
-                    cond = $"未采集{RelicRule.CategoryLabel(category)}";
-                    break;
-                case RelicConditionType.HasFlavorCountAtLeast:
-                    cond = $"风味种类≥{conditionInt}";
-                    break;
-                default:
-                    cond = condition.ToString();
-                    break;
-            }
-
-            string eff;
-            switch (effect)
-            {
-                case RelicEffectType.AddFinalMultiplier:
-                    eff = $"最终倍率+{floatValue:0.##}";
-                    break;
-                case RelicEffectType.AddFinalMultiplierPerPresentFlavor:
-                    eff = $"每种风味最终倍率+{floatValue:0.##}";
-                    break;
-                case RelicEffectType.DisableSpicyCap:
-                    eff = "热辣倍率无上限";
-                    break;
-                case RelicEffectType.GrantIngredientPerGather:
-                {
-                    string name = ingredient != null ? ingredient.DisplayName : "？";
-                    eff = $"每采集{intValue}→{name}×{amount}";
-                    break;
-                }
-                default:
-                    eff = effect.ToString();
-                    break;
-            }
-
-            return $"{RelicRule.TriggerLabel(trigger)} | {cond} → {eff}";
+            return $"{RelicRule.TriggerLabel(trigger)} → {effect}";
         }
     }
 }

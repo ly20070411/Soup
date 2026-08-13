@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: explosion
   displayName: "\u7206\u70B8"
-  description: "\u5904\u7406\u4EFB\u610F\u98DF\u6750\uFF08\u6BCF\u7CBE\u7075 8 \u4EFD\uFF09\uFF0C\u4F18\u5148\u5904\u7406\u5176\u4ED6\u5C97\u4F4D\u96BE\u4EE5\u5904\u7406\u7684\u6750\u8D28\u3002"
+  description: "\u5904\u7406\u4EFB\u610F\u98DF\u6750\uFF08\u6BCF\u7CBE\u7075 8 \u4EFD\uFF09\uFF1A\u6BCF\u4EFD\u4ECE\u67D4\u8F6F/\u5F3A\u97E7/\u575A\u56FA\u4E2D\u968F\u673A\u9009\u62E9\u3002\u7ED3\u7B97\u4F18\u5148\u7EA7\u6700\u4F4E\uFF0C\u4E13\u7CBE\u5904\u7406\u5C97\u5148\u5403\u6599\u3002"
   icon: {fileID: 0}
   tint: {r: 1, g: 1, b: 1, a: 1}
   jobType: 1
@@ -32,9 +32,10 @@ MonoBehaviour:
   sourPerGatherUnit: 0
   coldPerGatherUnit: 0
   magicPerGatherUnit: 0
-  processAmountPerWorker: 8
+  processAmountPerWorker: 80
   preferredMaterial: 99
   otherMaterialEfficiency: 1
   processRandom: 1
+  processPriority: 0
   cookAmountPerWorker: 10
   scoreMultiplier: 1

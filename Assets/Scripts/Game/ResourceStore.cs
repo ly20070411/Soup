@@ -6,7 +6,8 @@ namespace Soup.Game
 {
     /// <summary>
     /// Runtime resource panel: raw materials, flavors, processed, cooked.
-    /// Raw materials respect warehouse capacity from GameConfig.
+    /// Raw materials may temporarily exceed warehouse capacity during gather;
+    /// TurnManager enforces the cap after process.
     /// </summary>
     [DefaultExecutionOrder(-80)]
     public class ResourceStore : MonoBehaviour
@@ -25,6 +26,7 @@ namespace Soup.Game
         private int _magic;
         private int _processed;
         private int _cooked;
+        private int _warehouseCapacityBonus;
 
         public static ResourceStore Instance { get; private set; }
 
@@ -43,8 +45,19 @@ namespace Soup.Game
         /// <summary>未处理食材总数（三种材质之和）。</summary>
         public int TotalRaw => _soft + _tough + _solid;
 
-        /// <summary>仓库容量。0 = 不限。</summary>
-        public int WarehouseCapacity => config != null ? Mathf.Max(0, config.WarehouseCapacity) : 0;
+        /// <summary>关卡奖励等带来的仓库上限加成。</summary>
+        public int WarehouseCapacityBonus => _warehouseCapacityBonus;
+
+        /// <summary>仓库容量 = 配置基础值 + 运行时加成。0 = 不限（仅当基础与加成都为 0）。</summary>
+        public int WarehouseCapacity
+        {
+            get
+            {
+                int baseCap = config != null ? Mathf.Max(0, config.WarehouseCapacity) : 0;
+                // Bonus may be negative (e.g. event penalties).
+                return Mathf.Max(0, baseCap + _warehouseCapacityBonus);
+            }
+        }
 
         /// <summary>仓库剩余空位。不限容量时返回 int.MaxValue。</summary>
         public int WarehouseSpace
@@ -100,6 +113,39 @@ namespace Soup.Game
             _soft = _tough = _solid = 0;
             _spicy = _sour = _cold = _magic = 0;
             _processed = _cooked = 0;
+            _warehouseCapacityBonus = 0;
+            RaiseChanged();
+        }
+
+        public void ApplyState(
+            int soft, int tough, int solid,
+            int spicy, int sour, int cold, int magic,
+            int processed, int cooked,
+            int warehouseCapacityBonus = 0)
+        {
+            _soft = Mathf.Max(0, soft);
+            _tough = Mathf.Max(0, tough);
+            _solid = Mathf.Max(0, solid);
+            _spicy = Mathf.Max(0, spicy);
+            _sour = Mathf.Max(0, sour);
+            _cold = Mathf.Max(0, cold);
+            _magic = Mathf.Max(0, magic);
+            _processed = Mathf.Max(0, processed);
+            _cooked = Mathf.Max(0, cooked);
+            _warehouseCapacityBonus = warehouseCapacityBonus;
+            RaiseChanged();
+        }
+
+        public void AddWarehouseCapacityBonus(int amount)
+        {
+            if (amount == 0) return;
+            _warehouseCapacityBonus += amount;
+            RaiseChanged();
+        }
+
+        public void SetWarehouseCapacityBonus(int value)
+        {
+            _warehouseCapacityBonus = value;
             RaiseChanged();
         }
 
@@ -127,8 +173,29 @@ namespace Soup.Game
         }
 
         /// <summary>
+        /// Add raw material without warehouse capacity check.
+        /// Capacity is enforced after process (see TurnManager).
+        /// </summary>
+        public int AddRaw(IngredientMaterial material, int amount)
+        {
+            if (amount <= 0) return 0;
+            if (material == IngredientMaterial.Any) return 0;
+
+            switch (material)
+            {
+                case IngredientMaterial.Soft: _soft += amount; break;
+                case IngredientMaterial.Tough: _tough += amount; break;
+                case IngredientMaterial.Solid: _solid += amount; break;
+                default: return 0;
+            }
+
+            RaiseChanged();
+            return amount;
+        }
+
+        /// <summary>
         /// Add raw material, clamped by warehouse capacity.
-        /// Returns the amount actually stored.
+        /// Prefer <see cref="AddRaw"/> during gather; use this for direct capped inserts.
         /// </summary>
         public int TryAddRaw(IngredientMaterial material, int amount)
         {
@@ -138,17 +205,7 @@ namespace Soup.Game
             int space = WarehouseSpace;
             int accepted = space == int.MaxValue ? amount : Mathf.Min(amount, space);
             if (accepted <= 0) return 0;
-
-            switch (material)
-            {
-                case IngredientMaterial.Soft: _soft += accepted; break;
-                case IngredientMaterial.Tough: _tough += accepted; break;
-                case IngredientMaterial.Solid: _solid += accepted; break;
-                default: return 0;
-            }
-
-            RaiseChanged();
-            return accepted;
+            return AddRaw(material, accepted);
         }
 
         public bool TryConsumeRaw(IngredientMaterial material, int amount)

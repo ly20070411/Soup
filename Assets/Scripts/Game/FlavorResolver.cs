@@ -1,3 +1,4 @@
+using Soup.Employees;
 using Soup.Jobs;
 using UnityEngine;
 
@@ -74,25 +75,37 @@ namespace Soup.Game
         }
 
         /// <summary>
-        /// Progressive sour→score conversion vs cooked this turn.
+        /// Progressive sour→score conversion vs cooked food.
         /// Tiers: &lt;=10% →5, &lt;=50% →3, &lt;=100% →1, beyond cooked →0.
+        /// Only used at stage (大关) settlement — not each cook turn.
         /// Scored sour is consumed; excess remains.
         /// </summary>
+        public static void ResolveSourForSettlement(
+            ResourceStore store,
+            int cookedInStage,
+            out int sourUsed,
+            out int sourScore)
+        {
+            sourUsed = 0;
+            sourScore = 0;
+            if (store == null || cookedInStage <= 0) return;
+
+            int sour = store.Sour;
+            if (sour <= 0) return;
+
+            sourUsed = Mathf.Min(sour, cookedInStage);
+            sourScore = ScoreSour(sourUsed, cookedInStage);
+            if (sourUsed > 0)
+                store.ConsumeFlavorUpTo(FlavorType.Sour, sourUsed);
+        }
+
+        [System.Obsolete("Sour settles at stage end. Use ResolveSourForSettlement.")]
         public static void ResolveSour(ResourceStore store, TurnResult result)
         {
             if (store == null || result == null) return;
-
-            int cooked = result.CookedGained;
-            int sour = store.Sour;
-            if (cooked <= 0 || sour <= 0) return;
-
-            int scoredUnits = Mathf.Min(sour, cooked);
-            int score = ScoreSour(scoredUnits, cooked);
-            if (scoredUnits > 0)
-                store.ConsumeFlavorUpTo(FlavorType.Sour, scoredUnits);
-
+            ResolveSourForSettlement(store, result.CookedGained, out int used, out int score);
+            result.SourUsed += used;
             result.SourScore += score;
-            result.SourUsed += scoredUnits;
             result.ScoreGained += score;
         }
 
@@ -150,6 +163,17 @@ namespace Soup.Game
 
         public static bool HasCookWorkers(ElfManager elves)
         {
+            if (EmployeeManager.Instance != null)
+            {
+                foreach (var pair in EmployeeManager.Instance.GetLaborByJob())
+                {
+                    if (pair.Key != null && pair.Key.JobType == JobType.Cook && pair.Value > 0f)
+                        return true;
+                }
+
+                return false;
+            }
+
             if (elves == null) return false;
             foreach (var pair in elves.GetAssignments())
             {

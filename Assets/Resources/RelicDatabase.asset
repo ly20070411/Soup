@@ -13,7 +13,24 @@ MonoBehaviour:
   m_Name: RelicDatabase
   m_EditorClassIdentifier: 
   relics:
-  - {fileID: 11400000, guid: 195e864a63ff37d4da520af5085223e3, type: 2}
-  - {fileID: 11400000, guid: 6a71092c8b539a54f8c8ba390c21f9d5, type: 2}
-  - {fileID: 11400000, guid: 775dee4b35d8b7443a3de8302488f563, type: 2}
-  - {fileID: 11400000, guid: f7528da9face1264a830b5c32a3c4306, type: 2}
+  - {fileID: 11400000, guid: a82c928a895598142acb79609e9e4985, type: 2}
+  - {fileID: 11400000, guid: 8576dfeabb455c44497e860e6575cd4b, type: 2}
+  - {fileID: 11400000, guid: 4c30b694887a2ee46a29e49c6070982a, type: 2}
+  - {fileID: 11400000, guid: d9bcb9665f0332844af2c4a012f51887, type: 2}
+  - {fileID: 11400000, guid: 5c2c556328247b1408b9ca2f3432fae4, type: 2}
+  - {fileID: 11400000, guid: ce469c406f05ed14b8371855c331175c, type: 2}
+  - {fileID: 11400000, guid: 445998d908525b54fb3bf258384525d7, type: 2}
+  - {fileID: 11400000, guid: 3cbf7e81d7da1234b9c281c57cdd363c, type: 2}
+  - {fileID: 11400000, guid: 3b9190e2580f93a49b2ea4dd6aa31bdf, type: 2}
+  - {fileID: 11400000, guid: 15636ced696ec994dac6f90a180771e2, type: 2}
+  - {fileID: 11400000, guid: 014d26416814cc848b96683b20a04c11, type: 2}
+  - {fileID: 11400000, guid: f32712434ed5f4c46b17a88750a9e3de, type: 2}
+  - {fileID: 11400000, guid: 3b2218bca52c1d34f9839514f1b87167, type: 2}
+  - {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+  - {fileID: 11400000, guid: cb581de903d4665458c1790d4044c656, type: 2}
+  - {fileID: 11400000, guid: 952f4077c11cdbc47b2386f2b981ba97, type: 2}
+  - {fileID: 11400000, guid: 5ed4e70830e2e304fb8d4dc691cf8f25, type: 2}
+  - {fileID: 11400000, guid: 5af899f921495694092a3a0acd849c78, type: 2}
+  - {fileID: 11400000, guid: 2a7f7717ba8cab5459702430efa56d9b, type: 2}
+  - {fileID: 11400000, guid: e04b624beec89a64e97fedba70fafe80, type: 2}
+  - {fileID: 11400000, guid: 10a59158878c0ca469f2f66c1941e4e5, type: 2}

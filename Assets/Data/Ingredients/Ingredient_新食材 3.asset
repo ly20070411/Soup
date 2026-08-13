@@ -28,6 +28,6 @@ MonoBehaviour:
   weight: 1
   stats:
   - key: "\u67D4\u8F6F\u98DF\u6750"
-    value: 2
+    value: 20
   - key: "\u5F3A\u97E7\u98DF\u6750"
-    value: 1
+    value: 10

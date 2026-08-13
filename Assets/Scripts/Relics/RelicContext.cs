@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Soup.Game;
 using Soup.Items;
+using Soup.Jobs;
 using UnityEngine;
 
 namespace Soup.Relics
@@ -17,8 +18,12 @@ namespace Soup.Relics
         public TurnResult Result { get; }
         public int GatheredUnits { get; private set; }
         public float FinalMultiplier { get; set; } = 1f;
+        public float IndependentMultiplier { get; set; } = 1f;
         public bool SpicyUncapped { get; set; }
         public float SpicyMultiplierCap { get; set; } = 3f;
+        public int LevelTurnNumber { get; set; } = 1;
+        public int PreviousUnusedWarehouse { get; set; }
+        public int SolidProducedThisBatch { get; set; }
         public System.Action<IngredientYield> ApplyYield { get; set; }
 
         public RelicContext(ResourceStore store, TurnResult result)
