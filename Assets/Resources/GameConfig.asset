@@ -17,6 +17,6 @@ MonoBehaviour:
   spicyMultiplierCap: 3
   enableStageEndEvents: 1
   stageEndEventCount: 2
-  enableTurnEndEvents: 1
-  turnEndEventChance: 0.898
+  enableTurnEndEvents: 0
+  turnEndEventChance: 0.45
   eventCooldownTurns: 3

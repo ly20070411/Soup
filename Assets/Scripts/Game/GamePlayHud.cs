@@ -10,7 +10,10 @@ namespace Soup.Game
 {
     /// <summary>
     /// Control panel (relics / job unlock & advancement). Opened from overlay HUD.
+    /// 执行顺序在 PauseMenuUI(-45) 之前 + GUI.depth=1：面板在世界地图(5)之上、
+    /// 主菜单/暂停菜单(0)之下，任何情况下都不会盖住菜单按钮。
     /// </summary>
+    [DefaultExecutionOrder(-46)]
     public class GamePlayHud : MonoBehaviour
     {
         [SerializeField] private bool visible;
@@ -19,6 +22,7 @@ namespace Soup.Game
         private Vector2 _jobScroll;
         private Vector2 _relicScroll;
         private Vector2 _progressScroll;
+        private Vector2 _outerScroll;
         private string _lastResult = string.Empty;
         private readonly List<JobItem> _jobsCache = new List<JobItem>();
         private RelicAcquireStage _debugStage = RelicAcquireStage.Starting;
@@ -49,14 +53,20 @@ namespace Soup.Game
         {
             visible = open;
             if (open)
+            {
                 _valueFieldsSynced = false;
+                _outerScroll = Vector2.zero;
+            }
         }
 
         public void TogglePanelMode()
         {
             visible = !visible;
             if (visible)
+            {
                 _valueFieldsSynced = false;
+                _outerScroll = Vector2.zero;
+            }
         }
 
         private void OnEnable()
@@ -79,6 +89,14 @@ namespace Soup.Game
 
         private void Update()
         {
+            if (PauseMenuUI.IsOpen)
+            {
+                // 暂停菜单打开时收起本面板，避免两个模态叠在一起抢按钮。
+                if (visible)
+                    visible = false;
+                return;
+            }
+
             if (MainMenuUI.Instance != null && MainMenuUI.Instance.IsOpen)
             {
                 if (visible)
@@ -90,7 +108,10 @@ namespace Soup.Game
             {
                 visible = !visible;
                 if (visible)
+                {
                     _valueFieldsSynced = false;
+                    _outerScroll = Vector2.zero;
+                }
             }
             else if (visible && Input.GetKeyDown(KeyCode.Escape))
                 visible = false;
@@ -111,6 +132,10 @@ namespace Soup.Game
         private void OnGUI()
         {
             if (!visible) return;
+            if (PauseMenuUI.IsOpen) return;
+
+            // 世界地图(5)之上、各级菜单(0)之下的模态层。
+            GUI.depth = 1;
 
             // Dim background
             var dim = new Color(0f, 0f, 0f, 0.55f);
@@ -122,18 +147,22 @@ namespace Soup.Game
             float width = Mathf.Min(Screen.width * 0.88f, Screen.width - 64f);
             float height = Mathf.Min(Screen.height * 0.88f, Screen.height - 64f);
             var area = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
-            GUILayout.BeginArea(area, "box");
+            GUILayout.BeginArea(area, SoupUITheme.PanelBox);
+
+            // 各分区总高度可能超过模态高度（岗位分配/员工选择排在最后），
+            // 外层套滚动视图保证底部分区始终可达。
+            _outerScroll = GUILayout.BeginScrollView(_outerScroll, false, true);
 
             float relicH = Mathf.Clamp(height * 0.2f, 140f, 220f);
             float progressH = Mathf.Clamp(height * 0.24f, 180f, 280f);
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label("操控面板（遗物 / 岗位进阶 / 分配）", BoldLabel());
+            GUILayout.Label("操控面板（遗物 / 岗位进阶 / 分配）", SoupUITheme.BoldLabel);
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("关闭", GUILayout.Width(100f), GUILayout.Height(36f)))
                 visible = false;
             GUILayout.EndHorizontal();
-            GUILayout.Label($"[{toggleKey}] 开关 · [Esc] 关闭");
+            GUILayout.Label($"[{toggleKey}] 开关 · [Esc] 关闭", SoupUITheme.Label);
 
             GUILayout.Space(6f);
             DrawResourceBar();
@@ -150,6 +179,7 @@ namespace Soup.Game
             GUILayout.Space(6f);
             DrawLastResult();
 
+            GUILayout.EndScrollView();
             GUILayout.EndArea();
         }
 
@@ -226,7 +256,7 @@ namespace Soup.Game
                 {
                     GUILayout.BeginHorizontal();
                     Stat("本关烹饪", turns.StageCooked);
-                    GUILayout.Label("酸涩在第 MaxTurns 回合结束后结算，结算分计入本关目标判定");
+                    GUILayout.Label("酸涩在达标或最后一回合结束时自动结算，并计入本关目标判定");
                     GUILayout.EndHorizontal();
                 }
 
@@ -358,7 +388,7 @@ namespace Soup.Game
             }
 
             GUILayout.FlexibleSpace();
-            GUILayout.Label($"[{toggleKey}] 显隐");
+            GUILayout.Label($"[{toggleKey}] 显隐", SoupUITheme.Label);
             GUILayout.EndHorizontal();
 
             var eventMgr = EventManager.Instance;
@@ -369,7 +399,8 @@ namespace Soup.Game
                     ? (cool > 0 ? $"冷却剩余 {cool} 回合" : "可随机触发")
                     : "回合随机已关闭";
                 GUILayout.Label(
-                    $"族长的激励：{eventMgr.ChiefIncentive}   待选：{(eventMgr.HasPendingEvent ? eventMgr.PendingEvent.DisplayName : "无")}   {coolText}（间隔 {eventMgr.EventCooldownTurns} / 概率 {eventMgr.TurnEndEventChance:0.##}）");
+                    $"族长的激励：{eventMgr.ChiefIncentive}   待选：{(eventMgr.HasPendingEvent ? eventMgr.PendingEvent.DisplayName : "无")}   {coolText}（间隔 {eventMgr.EventCooldownTurns} / 概率 {eventMgr.TurnEndEventChance:0.##}）",
+                    SoupUITheme.Label);
             }
         }
 
@@ -841,11 +872,7 @@ namespace Soup.Game
             DrawJobGroup("采集", JobType.Gather, elves, em, progression);
             DrawJobGroup("处理", JobType.Process, elves, em, progression);
 
-            var activeCook = elves.GetActiveCookJob();
-            string cookTitle = activeCook != null
-                ? $"烹饪（当前：{activeCook.DisplayName}，三选一）"
-                : "烹饪（小火/中火/大火 三选一）";
-            DrawJobGroup(cookTitle, JobType.Cook, elves, em, progression);
+            DrawJobGroup("烹饪（火力可同时组合分配）", JobType.Cook, elves, em, progression);
 
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
@@ -873,13 +900,18 @@ namespace Soup.Game
                 string label = $"{type.DisplayName} 闲{free}/总{owned}";
                 if (selected)
                     GUI.backgroundColor = new Color(0.55f, 0.75f, 1f);
-                if (GUILayout.Button(label, GUILayout.Height(26f), GUILayout.MinWidth(120f)))
+                if (GUILayout.Button(
+                        type.Icon != null
+                            ? new GUIContent(label, type.Icon.texture)
+                            : new GUIContent(label),
+                        GUILayout.Height(26f),
+                        GUILayout.MinWidth(120f)))
                     _assignEmployeeTypeId = type.Id;
                 GUI.backgroundColor = Color.white;
             }
 
             GUILayout.EndHorizontal();
-            GUILayout.Label("世界地图 +/- 仍只调小精灵；幽灵请在此选择后用岗位按钮分配。");
+            GUILayout.Label("底部生产条与面板的 +/- 均按所选分配单位操作；蘑菇人锁定岗位不可手动分配。");
         }
 
         private void DrawJobGroup(
@@ -901,6 +933,7 @@ namespace Soup.Game
                 var job = _jobsCache[i];
                 if (job == null || job.JobType != type) continue;
                 if (progression != null && !progression.IsUnlocked(job)) continue;
+                if (JobModifierManager.Instance != null && JobModifierManager.Instance.IsDisabled(job)) continue;
 
                 int occupying = elves.GetAssigned(job);
                 float labor = em != null ? em.GetLaborOnJob(job) : occupying;
@@ -927,9 +960,18 @@ namespace Soup.Game
                 GUILayout.BeginHorizontal();
                 string mark = otherCookActive ? "·" : (isCook && occupying > 0 ? "✓" : " ");
                 string laborTag = Mathf.Abs(labor - occupying) > 0.01f ? $" 劳{labor:0.##}" : string.Empty;
+                if (job.Icon != null)
+                {
+                    GUILayout.Box(
+                        job.Icon.texture,
+                        GUIStyle.none,
+                        GUILayout.Width(28f),
+                        GUILayout.Height(28f));
+                }
+
                 GUILayout.Label(
                     $"{mark} {job.DisplayName}{levelLabel}  占{occupying}/{cap}{laborTag}  本类{typeAssigned}",
-                    GUILayout.Width(320f));
+                    GUILayout.Width(300f));
                 GUILayout.Label(job.GetEffectSummary(), GUILayout.MinWidth(200f));
 
                 GUI.enabled = typeAssigned > 0;

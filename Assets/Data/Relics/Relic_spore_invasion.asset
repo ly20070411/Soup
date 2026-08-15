@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac898d106334b3f4781d12f8d5c79a54, type: 3}
+  m_Name: Relic_spore_invasion
+  m_EditorClassIdentifier: 
+  id: spore_invasion
+  displayName: 孢子入侵
+  description: 每采集 5 个采集物，就会产出 1 份蘑菇食材。
+  icon: {fileID: 0}
+  tint: {r: 1, g: 1, b: 1, a: 1}
+  acquireStage: 0
+  rules:
+  - trigger: 0
+    condition: 0
+    conditionCategory: 99
+    conditionInt: 0
+    conditionIntMax: 0
+    effect: 3
+    floatValue: 0
+    intValue: 5
+    amount: 1
+    ingredient: {fileID: 11400000, guid: 345633403a27a5a4d9c974bafb226373, type: 2}
+    material: 0
+    employeeTypeId: 
+    linkedRelic: {fileID: 0}

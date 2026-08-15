@@ -70,7 +70,7 @@ namespace Soup.Game
                 Instance = null;
         }
 
-        public void ResetRun()
+        public void ResetRun(bool restartLevel = true)
         {
             ClearUndoSnapshot();
             _turnIndex = 0;
@@ -81,11 +81,12 @@ namespace Soup.Game
             _stageCooked = 0;
             ResourceStore.Instance?.Clear();
             EmployeeManager.Instance?.ResetRun();
+            JobModifierManager.Instance?.ResetRun();
             ElfManager.Instance?.ResetFromConfig();
             RelicManager.Instance?.ResetRun();
             JobProgressionManager.Instance?.ResetRun();
             EventManager.Instance?.ResetRun();
-            LevelManager.Instance?.ResetRun();
+            LevelManager.Instance?.ResetRun(restartLevel);
             ElfManager.Instance?.ClearAssignments();
         }
 
@@ -225,6 +226,73 @@ namespace Soup.Game
             return result;
         }
 
+        /// <summary>
+        /// 不改变状态的基础产能预览。随机食材只统计总量；遗物的最终乘区在实际结算中另行显示。
+        /// </summary>
+        public TurnCapacityPreview PreviewNextTurnCapacity()
+        {
+            var preview = new TurnCapacityPreview();
+            var store = ResourceStore.Instance;
+            var modifiers = JobModifierManager.Instance;
+
+            foreach (var pair in GetJobLaborMap())
+            {
+                var job = pair.Key;
+                float labor = pair.Value;
+                if (job == null || labor <= 0f) continue;
+                if (modifiers != null && modifiers.IsDisabled(job)) continue;
+
+                switch (job.JobType)
+                {
+                    case JobType.Gather:
+                    {
+                        float yieldMult = modifiers != null ? modifiers.GetYieldMultiplier(job) : 1f;
+                        int units = GameMath.CeilToInt(labor * job.GatherAmountPerWorker * yieldMult);
+                        if (job.OutputIngredient != null)
+                        {
+                            var yield = IngredientYieldResolver.FromIngredient(job.OutputIngredient, units);
+                            preview.GatherRaw += yield.TotalFixedRaw + yield.RandomMaterial;
+                            preview.GatherFlavor += yield.TotalFlavor;
+                        }
+                        else
+                        {
+                            preview.GatherRaw += units * job.MaterialPerGatherUnit;
+                            preview.GatherFlavor += units * (
+                                job.SpicyPerGatherUnit
+                                + job.SourPerGatherUnit
+                                + job.ColdPerGatherUnit
+                                + job.MagicPerGatherUnit);
+                        }
+
+                        if (modifiers != null
+                            && modifiers.TryGetBonusFlavor(job, out _, out int fixedFlavor))
+                            preview.GatherFlavor += fixedFlavor;
+                        break;
+                    }
+                    case JobType.Process:
+                        preview.ProcessCapacity += GameMath.CeilToInt(labor * job.ProcessAmountPerWorker);
+                        break;
+                    case JobType.Cook:
+                    {
+                        int demand = GameMath.CeilToInt(labor * job.CookAmountPerWorker);
+                        preview.CookCapacity += demand;
+                        preview.CookScoreAtCapacity += GameMath.CeilMul(demand, job.ScoreMultiplier);
+                        break;
+                    }
+                }
+            }
+
+            if (store != null && store.WarehouseCapacity > 0)
+            {
+                int rawAfterBestCaseProcess = Mathf.Max(
+                    0,
+                    store.TotalRaw + preview.GatherRaw - preview.ProcessCapacity);
+                preview.OverflowRisk = Mathf.Max(0, rawAfterBestCaseProcess - store.WarehouseCapacity);
+            }
+
+            return preview;
+        }
+
         private static RelicContext BuildRelicContext(
             ResourceStore store,
             TurnResult result,
@@ -282,6 +350,7 @@ namespace Soup.Game
             RelicContext relicCtx,
             List<GatherTurnOutput> gatherOutputs)
         {
+            var modifiers = JobModifierManager.Instance;
             foreach (var pair in GetJobLaborMap())
             {
                 var job = pair.Key;
@@ -289,8 +358,23 @@ namespace Soup.Game
                 if (job == null || labor <= 0f || job.JobType != JobType.Gather)
                     continue;
 
-                int units = GameMath.CeilToInt(labor * job.GatherAmountPerWorker);
+                if (modifiers != null && modifiers.IsDisabled(job))
+                    continue;
+
+                // 进阶专属事件可调整采集产量（如 孢子感染：蘑菇产量增加 30%）。
+                float yieldMult = modifiers != null ? modifiers.GetYieldMultiplier(job) : 1f;
+                int units = GameMath.CeilToInt(labor * job.GatherAmountPerWorker * yieldMult);
                 if (units <= 0) continue;
+
+                // 进阶专属事件的额外风味（如 冷笑话：风味产量加 10 点）。
+                if (modifiers != null
+                    && modifiers.TryGetBonusFlavor(job, out var bonusFlavor, out int flavorPerUnit))
+                {
+                    // 事件数值按“该岗位本回合有产出时固定增加”结算，避免随高产岗位失控。
+                    int bonusFlavorAmount = flavorPerUnit;
+                    store.AddFlavor(bonusFlavor, bonusFlavorAmount);
+                    result.FlavorGained += bonusFlavorAmount;
+                }
 
                 var bucket = GetOrCreateOutput(gatherOutputs, job, GetGatherJobNumber(job));
 
@@ -818,6 +902,24 @@ namespace Soup.Game
     }
 
     [Serializable]
+    public class TurnCapacityPreview
+    {
+        public int GatherRaw;
+        public int GatherFlavor;
+        public int ProcessCapacity;
+        public int CookCapacity;
+        public int CookScoreAtCapacity;
+        public int OverflowRisk;
+
+        public override string ToString()
+        {
+            string overflow = OverflowRisk > 0 ? $"；溢出风险至少 {OverflowRisk}" : string.Empty;
+            return $"产能预览：采集原料 +{GatherRaw} / 风味 +{GatherFlavor}；" +
+                   $"处理最多 {ProcessCapacity}；烹饪最多 {CookCapacity}（基础分上限 {CookScoreAtCapacity}）{overflow}";
+        }
+    }
+
+    [Serializable]
     public class StageSettlementResult
     {
         public int StageIndex;
@@ -853,6 +955,7 @@ namespace Soup.Game
         public int CookScoreBase;
         public int CookScore;
         public float SpicyMultiplier = 1f;
+        public int SpicyUsed;
         public float FinalMultiplier = 1f;
         public float IndependentMultiplier = 1f;
         public int ColdUsed;
@@ -871,7 +974,7 @@ namespace Soup.Game
                 $"cook {ProcessedConsumed}→{CookedGained}, " +
                 $"score+{ScoreGained} (cook {CookScoreBase}→{CookScore}×{SpicyMultiplier:0.##}, " +
                 $"final×{FinalMultiplier:0.##}×{IndependentMultiplier:0.##}, " +
-                $"cold {ColdScore}, sour {SourScore}, magic {MagicScore})";
+                $"spicy used {SpicyUsed}, cold {ColdScore}, sour {SourScore}, magic {MagicScore})";
         }
     }
 }

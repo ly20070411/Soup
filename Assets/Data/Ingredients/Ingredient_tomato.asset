@@ -15,7 +15,7 @@ MonoBehaviour:
   id: berry
   displayName: "\u5C0F\u751C\u679C"
   description: "\u7D20\u98DF\uFF0C\u5F88\u57FA\u7840\u7684\u98DF\u6750"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: afae6b10da3fb3648ba39266c8ed5360, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   category: 0
   tags:

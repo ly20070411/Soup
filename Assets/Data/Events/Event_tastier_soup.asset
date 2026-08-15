@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ade3303ee8efbd4b9a09e619d12f6a9, type: 3}
+  m_Name: Event_tastier_soup
+  m_EditorClassIdentifier: 
+  id: tastier_soup
+  displayName: 更美味的汤
+  description: 族长发现生命落入汤中会短暂驱散饥雾，这个结论让所有人沉默。
+  triggerLevelIndex: 2
+  requiredJobId: 
+  options:
+  - text: 牺牲 1 只小精灵，获得激励
+    effects:
+    - kind: 2
+      targetId: 
+      secondTargetId: 
+      intAmount: -1
+      floatAmount: 1
+      chance: 1
+    - kind: 0
+      targetId: incentive
+      secondTargetId: 
+      intAmount: 1
+      floatAmount: 1
+      chance: 1
+  - text: 拒绝牺牲（无额外效果）
+    effects: []

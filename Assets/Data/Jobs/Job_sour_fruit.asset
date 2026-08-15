@@ -15,7 +15,7 @@ MonoBehaviour:
   id: sour_fruit
   displayName: "\u9752\u9178\u679C"
   description: "\u91C7\u96C6\u9752\u9178\u679C\u3002"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 97d263c5cd73a9145bcece2467d3910a, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   jobType: 0
   maxWorkers: 5
@@ -36,5 +36,6 @@ MonoBehaviour:
   preferredMaterial: 0
   otherMaterialEfficiency: 0.5
   processRandom: 0
+  processPriority: 100
   cookAmountPerWorker: 10
   scoreMultiplier: 1

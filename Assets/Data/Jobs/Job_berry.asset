@@ -15,7 +15,7 @@ MonoBehaviour:
   id: berry
   displayName: "\u5C0F\u751C\u679C"
   description: "\u91C7\u96C6\u5C0F\u751C\u679C\u3002"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: afae6b10da3fb3648ba39266c8ed5360, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   jobType: 0
   maxWorkers: 5
@@ -36,5 +36,6 @@ MonoBehaviour:
   preferredMaterial: 0
   otherMaterialEfficiency: 0.5
   processRandom: 0
+  processPriority: 100
   cookAmountPerWorker: 10
   scoreMultiplier: 1

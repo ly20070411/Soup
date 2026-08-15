@@ -290,6 +290,18 @@ namespace Soup.Jobs
             return ok;
         }
 
+        /// <summary>关卡奖励直接解锁一个采集岗，不依赖调试面板的临时候选列表。</summary>
+        public bool TryUnlockGatherJob(JobItem job)
+        {
+            if (job == null || job.JobType != JobType.Gather) return false;
+            if (IsUnlocked(job) || !CanUnlockMore(JobType.Gather)) return false;
+
+            bool ok = UnlockInternal(job);
+            if (ok)
+                _gatherOffer.Clear();
+            return ok;
+        }
+
         /// <summary>
         /// Replace an unlocked gather job with one from the current offer when slots are full.
         /// Permanent starter (mushroom) cannot be replaced. Incoming job starts at Lv0.

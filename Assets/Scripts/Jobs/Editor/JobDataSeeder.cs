@@ -65,6 +65,18 @@ namespace Soup.Jobs.Editor
                 IngredientMaterial.Tough, 1);
             CreateGather(db, ingredients, "little_spiky_ball", "小刺球", "采集小刺球。", 15,
                 IngredientMaterial.Solid, 1);
+            CreateGather(db, ingredients, "rush", "灯芯草", "采集灯芯草。", 3,
+                IngredientMaterial.Soft, 1);
+            CreateGather(db, ingredients, "daisy", "小白花", "采集小白花。", 5,
+                IngredientMaterial.Soft, 1);
+            CreateGather(db, ingredients, "silver_fish", "小银鱼", "采集小银鱼。", 5,
+                IngredientMaterial.Soft, 1);
+            CreateGather(db, ingredients, "happy_blob", "快乐坨坨", "采集快乐坨坨。", 5,
+                IngredientMaterial.Soft, 1);
+            CreateGather(db, ingredients, "twin_tail_snake", "双尾蛇", "采集双尾蛇。", 2,
+                IngredientMaterial.Soft, 1);
+            CreateGather(db, ingredients, "stick_bug", "棍棍虫", "采集棍棍虫。", 12,
+                IngredientMaterial.Solid, 1);
 
             // Process
             CreateProcess(db, "knife_cut", "刀切", "优先处理柔软食材，其他材质效率减半。",

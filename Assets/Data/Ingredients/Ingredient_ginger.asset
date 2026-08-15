@@ -15,7 +15,7 @@ MonoBehaviour:
   id: magic leaf
   displayName: "\u9B54\u6CD5\u53F6"
   description: "\u7D20\u98DF\uFF0C\u4F60\u6C38\u8FDC\u4E0D\u77E5\u9053\u4E0B\u4E00\u53E3\u662F\u4EC0\u4E48\u5473\u9053"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 26ed48f08d34c2b49972c25fc9e8acfb, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   category: 0
   tags:

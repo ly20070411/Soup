@@ -251,7 +251,8 @@ namespace Soup.Relics
 
         /// <summary>
         /// Build a random offer of unowned relics, preferring <paramref name="preferredStage"/>,
-        /// then filling from other stages if needed. Starting relics are never offered.
+        /// then filling from other stages if needed. 开局调用只提供开局遗物；
+        /// 非开局调用不会把开局遗物混入事件奖励池。
         /// </summary>
         public List<RelicItem> CreateOffer(int count, RelicAcquireStage preferredStage)
         {
@@ -265,12 +266,18 @@ namespace Soup.Relics
             {
                 var relic = all[i];
                 if (relic == null || _owned.Contains(relic)) continue;
-                if (relic.AcquireStage == RelicAcquireStage.Starting) continue;
+                if (preferredStage != RelicAcquireStage.Starting
+                    && relic.AcquireStage == RelicAcquireStage.Starting)
+                    continue;
                 if (relic.AcquireStage == preferredStage)
                     preferred.Add(relic);
                 else
                     others.Add(relic);
             }
+
+            // 开局必须严格保持三选一的开局池，不用事件遗物补位。
+            if (preferredStage == RelicAcquireStage.Starting)
+                others.Clear();
 
             Shuffle(preferred);
             Shuffle(others);

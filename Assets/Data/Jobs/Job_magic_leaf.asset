@@ -15,7 +15,7 @@ MonoBehaviour:
   id: magic_leaf
   displayName: "\u9B54\u6CD5\u53F6"
   description: "\u91C7\u96C6\u9B54\u6CD5\u53F6\u3002"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 26ed48f08d34c2b49972c25fc9e8acfb, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   jobType: 0
   maxWorkers: 5
@@ -36,5 +36,6 @@ MonoBehaviour:
   preferredMaterial: 0
   otherMaterialEfficiency: 0.5
   processRandom: 0
+  processPriority: 100
   cookAmountPerWorker: 10
   scoreMultiplier: 1

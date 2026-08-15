@@ -15,7 +15,7 @@ MonoBehaviour:
   id: mushroom
   displayName: "\u8611\u83C7"
   description: "\u91C7\u96C6\u8611\u83C7\u3002"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 59454fb094308a746bf0f2af4ed8b017, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   jobType: 0
   maxWorkers: 5
@@ -36,5 +36,6 @@ MonoBehaviour:
   preferredMaterial: 0
   otherMaterialEfficiency: 0.5
   processRandom: 0
+  processPriority: 100
   cookAmountPerWorker: 10
   scoreMultiplier: 1

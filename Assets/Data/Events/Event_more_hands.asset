@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ade3303ee8efbd4b9a09e619d12f6a9, type: 3}
+  m_Name: Event_more_hands
+  m_EditorClassIdentifier: 
+  id: more_hands
+  displayName: 更多人手？
+  description: 族长带来一只想加入厨房的小精灵，但它还没学会安全守则。
+  triggerLevelIndex: 0
+  requiredJobId: 
+  options:
+  - text: 招募 1 只小精灵（本局永久）
+    effects:
+    - kind: 2
+      targetId: 
+      secondTargetId: 
+      intAmount: 1
+      floatAmount: 1
+      chance: 1
+  - text: 维持现状
+    effects: []

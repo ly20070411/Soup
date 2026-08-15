@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ade3303ee8efbd4b9a09e619d12f6a9, type: 3}
+  m_Name: Event_mysterious_tomb
+  m_EditorClassIdentifier: 
+  id: mysterious_tomb
+  displayName: 神秘墓穴
+  description: 采集队在厨房地下发现一座冒着寒气的旧厨工墓穴。
+  triggerLevelIndex: 1
+  requiredJobId: 
+  options:
+  - text: 改造成冷藏室（仓库上限 +100）
+    effects:
+    - kind: 6
+      targetId: 
+      secondTargetId: 
+      intAmount: 100
+      floatAmount: 1
+      chance: 1
+  - text: 封好入口（无额外效果）
+    effects: []

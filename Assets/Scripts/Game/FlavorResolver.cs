@@ -47,7 +47,8 @@ namespace Soup.Game
         /// <summary>
         /// Independent multiplier on cook-station score:
         /// 1 + spicy * 2 / cookedThisTurn.
-        /// Optionally capped unless relics disable the cap.
+        /// Optionally capped unless relics disable the cap. Only the amount actually
+        /// needed for the capped multiplier is consumed; uncapped mode consumes all.
         /// </summary>
         public static void ApplySpicyToCookScore(
             ResourceStore store,
@@ -60,9 +61,14 @@ namespace Soup.Game
 
             int cooked = result.CookedGained;
             int spicy = store.Spicy;
+            int spicyUsed = CalculateSpicyUsage(
+                spicy,
+                cooked,
+                spicyMultiplierCap,
+                spicyUncapped);
             float mult = 1f;
-            if (cooked > 0 && spicy > 0)
-                mult = 1f + spicy * 2f / cooked;
+            if (cooked > 0 && spicyUsed > 0)
+                mult = 1f + spicyUsed * 2f / cooked;
 
             if (!spicyUncapped && spicyMultiplierCap > 0f)
                 mult = Mathf.Min(mult, spicyMultiplierCap);
@@ -70,8 +76,30 @@ namespace Soup.Game
             int boosted = GameMath.CeilToInt(result.CookScoreBase * mult);
             int delta = boosted - result.CookScoreBase;
             result.SpicyMultiplier = mult;
+            result.SpicyUsed = spicyUsed;
             result.CookScore = boosted;
             result.ScoreGained += delta;
+            if (spicyUsed > 0)
+                store.ConsumeFlavorUpTo(FlavorType.Spicy, spicyUsed);
+        }
+
+        public static int CalculateSpicyUsage(
+            int availableSpicy,
+            int cookedThisTurn,
+            float spicyMultiplierCap,
+            bool spicyUncapped)
+        {
+            availableSpicy = Mathf.Max(0, availableSpicy);
+            cookedThisTurn = Mathf.Max(0, cookedThisTurn);
+            if (availableSpicy == 0 || cookedThisTurn == 0) return 0;
+            if (spicyUncapped || spicyMultiplierCap <= 0f)
+                return availableSpicy;
+            if (spicyMultiplierCap <= 1f)
+                return 0;
+
+            int requiredForCap = GameMath.CeilToInt(
+                (spicyMultiplierCap - 1f) * cookedThisTurn * 0.5f);
+            return Mathf.Min(availableSpicy, requiredForCap);
         }
 
         /// <summary>
