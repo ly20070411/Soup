@@ -1,10 +1,11 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
 namespace Soup.Items.Editor
 {
     /// <summary>
-    /// One-click sample data bootstrap for the ingredient manager.
+    /// Seeds ingredient definitions from the design table「采集物对应数据表」.
     /// </summary>
     public static class IngredientDataSeeder
     {
@@ -13,6 +14,12 @@ namespace Soup.Items.Editor
 
         [MenuItem("Soup/Ingredient Manager/Seed Sample Ingredients")]
         public static void SeedSamplesMenu()
+        {
+            SeedSamples(openWindow: true);
+        }
+
+        [MenuItem("Soup/Ingredient Manager/Seed All Ingredients From Table")]
+        public static void SeedAllFromTableMenu()
         {
             SeedSamples(openWindow: true);
         }
@@ -29,55 +36,90 @@ namespace Soup.Items.Editor
                 AssetDatabase.CreateAsset(db, DatabasePath);
             }
 
-            CreateOrUpdate(db, "tomato", "番茄", "酸甜多汁的基础汤底食材。",
-                IngredientCategory.Vegetable, new[] { "蔬菜", "汤底", "红色" }, 8, 1,
-                item =>
-                {
-                    item.SetStat("salty", 0.2f);
-                    item.SetStat("sweet", 1.5f);
-                    item.SetStat("sour", 2.0f);
-                    item.SetStat("umami", 1.0f);
-                    item.SetStat("cookTime", 1.2f);
-                });
+            // —— 采集物对应数据表 ——
+            Seed(db, "mushroom", "蘑菇", "素食，20 份柔软食材。",
+                IngredientCategory.Vegetable, veg: true,
+                ("柔软食材", 20f));
 
-            CreateOrUpdate(db, "potato", "土豆", "厚实软糯，增加汤的饱腹感。",
-                IngredientCategory.Vegetable, new[] { "蔬菜", "淀粉" }, 6, 0,
-                item =>
-                {
-                    item.SetStat("salty", 0.1f);
-                    item.SetStat("sweet", 0.6f);
-                    item.SetStat("umami", 0.4f);
-                    item.SetStat("cookTime", 2.0f);
-                });
+            Seed(db, "berry", "小甜果", "素食，30 份柔软食材。",
+                IngredientCategory.Vegetable, veg: true,
+                ("柔软食材", 30f));
 
-            CreateOrUpdate(db, "beef", "牛肉", "浓郁肉香，提升鲜味。",
-                IngredientCategory.Meat, new[] { "肉类", "高蛋白" }, 28, 2,
-                item =>
-                {
-                    item.SetStat("salty", 0.5f);
-                    item.SetStat("umami", 3.0f);
-                    item.SetStat("heat", 0.2f);
-                    item.SetStat("cookTime", 3.5f);
-                });
+            Seed(db, "ice_fruit", "冰晶果", "素食，50 份坚固食材，10 份寒冷。",
+                IngredientCategory.Vegetable, veg: true,
+                ("坚固食材", 50f), ("寒冷", 10f));
 
-            CreateOrUpdate(db, "ginger", "生姜", "驱寒提味，常用香辛料。",
-                IngredientCategory.Spice, new[] { "香料", "辛香" }, 5, 1,
-                item =>
-                {
-                    item.SetStat("spicy", 1.2f);
-                    item.SetStat("heat", 1.5f);
-                    item.SetStat("bitter", 0.4f);
-                    item.SetStat("cookTime", 0.5f);
-                });
+            Seed(db, "hot_fruit", "爆辣果", "素食，50 份强韧食材，10 份热辣。",
+                IngredientCategory.Vegetable, veg: true,
+                ("强韧食材", 50f), ("热辣", 10f));
 
-            CreateOrUpdate(db, "kelp", "海带", "天然鲜味来源，适合清汤。",
-                IngredientCategory.Seafood, new[] { "海鲜", "汤底", "鲜味" }, 10, 1,
-                item =>
-                {
-                    item.SetStat("salty", 1.0f);
-                    item.SetStat("umami", 2.8f);
-                    item.SetStat("cookTime", 1.8f);
-                });
+            Seed(db, "sour_fruit", "青酸果", "素食，50 份柔软食材，10 份酸涩。",
+                IngredientCategory.Vegetable, veg: true,
+                ("柔软食材", 50f), ("酸涩", 10f));
+
+            Seed(db, "magic_leaf", "魔法叶", "素食，50 份柔软食材，8 份随机风味。",
+                IngredientCategory.Vegetable, veg: true,
+                ("柔软食材", 50f), ("随机风味", 8f));
+
+            Seed(db, "lampwick_grass", "灯芯草", "素食，15 份柔软食材，10 份强韧食材。",
+                IngredientCategory.Vegetable, veg: true,
+                ("柔软食材", 15f), ("强韧食材", 10f));
+
+            Seed(db, "little_white_flower", "小白花", "素食，20 份柔软食材。",
+                IngredientCategory.Vegetable, veg: true,
+                ("柔软食材", 20f));
+
+            Seed(db, "sweet_bun", "甜团团", "肉类，柔软 / 强韧 / 坚固各 20 份。",
+                IngredientCategory.Meat, veg: false,
+                ("柔软食材", 20f), ("强韧食材", 20f), ("坚固食材", 20f));
+
+            Seed(db, "big_horn_beast", "大角兽", "肉类，30 份柔软食材，100 份坚固食材。",
+                IngredientCategory.Meat, veg: false,
+                ("柔软食材", 30f), ("坚固食材", 100f));
+
+            Seed(db, "nian_papa", "黏爬爬", "肉类，30 份强韧食材。",
+                IngredientCategory.Meat, veg: false,
+                ("强韧食材", 30f));
+
+            Seed(db, "little_spiky_ball", "小刺球", "肉类，10 份随机食材。",
+                IngredientCategory.Meat, veg: false,
+                ("随机食材", 10f));
+
+            Seed(db, "little_silver_fish", "小银鱼", "肉类，50 份柔软食材，10 份鲜美。",
+                IngredientCategory.Meat, veg: false,
+                ("柔软食材", 50f), ("鲜美", 10f));
+
+            Seed(db, "happy_tuotuo", "快乐坨坨", "肉类，20 份柔软食材。",
+                IngredientCategory.Meat, veg: false,
+                ("柔软食材", 20f));
+
+            Seed(db, "double_tail_snake", "双尾蛇", "肉类，25 份柔软食材，8 份热辣和 8 份寒冷。",
+                IngredientCategory.Meat, veg: false,
+                ("柔软食材", 25f), ("热辣", 8f), ("寒冷", 8f));
+
+            Seed(db, "stick_bug", "棍棍虫", "肉类，10 份坚固食材。",
+                IngredientCategory.Meat, veg: false,
+                ("坚固食材", 10f));
+
+            Seed(db, "mutant_mushroom", "变异蘑菇", "蘑菇进阶获得。20 份柔软，10 份随机风味。",
+                IngredientCategory.Vegetable, veg: true,
+                ("柔软食材", 20f), ("随机风味", 10f));
+
+            Seed(db, "fat_mushroom", "肥大蘑菇", "蘑菇进阶获得。50 份柔软，10 份随机风味。",
+                IngredientCategory.Vegetable, veg: true,
+                ("柔软食材", 50f), ("随机风味", 10f));
+
+            Seed(db, "strange_mushroom", "奇异蘑菇", "蘑菇进阶获得。30 份柔软，20 份随机风味。",
+                IngredientCategory.Vegetable, veg: true,
+                ("柔软食材", 30f), ("随机风味", 20f));
+
+            Seed(db, "big_ball", "大团球", "甜团团进阶获得。柔软 / 强韧 / 坚固各 80 份。",
+                IngredientCategory.Meat, veg: false,
+                ("柔软食材", 80f), ("强韧食材", 80f), ("坚固食材", 80f));
+
+            Seed(db, "giant_mountain", "巨团山", "甜团团进阶获得。柔软 / 强韧 / 坚固各 200 份。",
+                IngredientCategory.Meat, veg: false,
+                ("柔软食材", 200f), ("强韧食材", 200f), ("坚固食材", 200f));
 
             EditorUtility.SetDirty(db);
             AssetDatabase.SaveAssets();
@@ -86,23 +128,21 @@ namespace Soup.Items.Editor
             if (openWindow)
                 IngredientManagerWindow.Open();
 
-            Debug.Log("[物品管理器] 示例食材已填充，当前数量: " + db.Count);
+            Debug.Log("[物品管理器] 表格食材已填充，当前数量: " + db.Count);
             return db;
         }
 
-        private static void CreateOrUpdate(
+        private static void Seed(
             IngredientDatabase db,
             string id,
             string displayName,
             string description,
             IngredientCategory category,
-            string[] tags,
-            int price,
-            int rarity,
-            System.Action<IngredientItem> configureStats)
+            bool veg,
+            params (string key, float value)[] stats)
         {
-            string path = IngredientFolder + "/Ingredient_" + id + ".asset";
-            var item = AssetDatabase.LoadAssetAtPath<IngredientItem>(path);
+            var item = FindExisting(id, displayName);
+            string path = $"{IngredientFolder}/Ingredient_{id}.asset";
             if (item == null)
             {
                 item = ScriptableObject.CreateInstance<IngredientItem>();
@@ -112,11 +152,34 @@ namespace Soup.Items.Editor
             item.SetIdentity(id, displayName);
             item.SetDescription(description);
             item.SetCategory(category);
-            item.SetTags(tags);
-            item.SetCoreValues(price, rarity, 99, 1f);
-            configureStats?.Invoke(item);
+            item.SetTags(veg
+                ? new[] { "素食", "采集物" }
+                : new[] { "肉类", "采集物" });
+            item.SetCoreValues(0, 0, 99, 1f);
+            item.SetStats(stats);
             EditorUtility.SetDirty(item);
             db.Add(item);
+        }
+
+        private static IngredientItem FindExisting(string id, string displayName)
+        {
+            string preferred = $"{IngredientFolder}/Ingredient_{id}.asset";
+            var atPath = AssetDatabase.LoadAssetAtPath<IngredientItem>(preferred);
+            if (atPath != null) return atPath;
+
+            foreach (var guid in AssetDatabase.FindAssets("t:IngredientItem"))
+            {
+                var item = AssetDatabase.LoadAssetAtPath<IngredientItem>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (item == null) continue;
+                if (!string.IsNullOrEmpty(id) && item.Id == id)
+                    return item;
+                if (!string.IsNullOrEmpty(displayName)
+                    && string.Equals(item.DisplayName, displayName, System.StringComparison.Ordinal))
+                    return item;
+            }
+
+            return null;
         }
 
         private static void EnsureFolder(string path)

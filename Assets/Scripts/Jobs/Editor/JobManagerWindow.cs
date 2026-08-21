@@ -192,20 +192,91 @@ namespace Soup.Jobs.Editor
                 EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("maxWorkers"), new GUIContent("人数上限 (0=不限)"));
 
                 EditorGUILayout.Space(6);
-                EditorGUILayout.LabelField("岗位进阶", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("岗位进阶树", EditorStyles.boldLabel);
                 EditorGUILayout.HelpBox(
-                    $"最多升级 {JobProgressionRules.MaxUpgradesPerJob(_selectedItem.JobType)} 次。" +
+                    $"树状进阶，最多 {JobProgressionRules.MaxUpgradesPerJob(_selectedItem.JobType)} 次。" +
+                    " 一阶二选一（1 / 2），二阶在已选分支上再二选一（1-1/1-2 或 2-1/2-2）。" +
                     (JobProgressionRules.UsesPopulationCap(_selectedItem.JobType)
-                        ? " 默认每级 +5 人口；额外效果按「岗位及效果一览」填写。"
+                        ? " 默认每节点 +5 人口；额外效果按岗位填写。"
                         : " 烹饪进阶效果暂留空，勿擅自填写。"),
                     MessageType.None);
-                if (GUILayout.Button("按规则补齐进阶层", GUILayout.Width(140)))
+                string seedLabel = _selectedItem.Id switch
                 {
-                    _selectedItem.SeedDefaultUpgradeTiers();
+                    "mushroom" => "载入蘑菇进阶树",
+                    "berry" => "载入小甜果进阶树",
+                    "ice_fruit" => "载入冰晶果进阶树",
+                    "hot_fruit" => "载入爆辣果进阶树",
+                    "sour_fruit" => "载入青酸果进阶树",
+                    "magic_leaf" => "载入魔法叶进阶树",
+                    "lampwick_grass" => "载入灯芯草进阶树",
+                    "little_white_flower" => "载入小白花进阶树",
+                    "sweet_bun" => "载入甜团团进阶树",
+                    "big_horn_beast" => "载入大角兽进阶树",
+                    "nian_papa" => "载入黏爬爬进阶树",
+                    "little_spiky_ball" => "载入小刺球进阶树",
+                    "little_silver_fish" => "载入小银鱼进阶树",
+                    "happy_tuotuo" => "载入快乐坨坨进阶树",
+                    "double_tail_snake" => "载入双尾蛇进阶树",
+                    "stick_bug" => "载入棍棍虫进阶树",
+                    "knife_cut" => "载入刀切进阶树",
+                    "chainsaw" => "载入电锯进阶树",
+                    "drill" => "载入钻头进阶树",
+                    "explosion" => "载入爆炸进阶树",
+                    _ => "重置为默认进阶树"
+                };
+                if (GUILayout.Button(seedLabel, GUILayout.Width(160)))
+                {
+                    if (_selectedItem.Id == "mushroom")
+                        _selectedItem.SeedMushroomAdvanceTree();
+                    else if (_selectedItem.Id == "berry")
+                        _selectedItem.SeedBerryAdvanceTree();
+                    else if (_selectedItem.Id == "ice_fruit")
+                        _selectedItem.SeedIceFruitAdvanceTree();
+                    else if (_selectedItem.Id == "hot_fruit")
+                        _selectedItem.SeedHotFruitAdvanceTree();
+                    else if (_selectedItem.Id == "sour_fruit")
+                        _selectedItem.SeedSourFruitAdvanceTree();
+                    else if (_selectedItem.Id == "magic_leaf")
+                        _selectedItem.SeedMagicLeafAdvanceTree();
+                    else if (_selectedItem.Id == "lampwick_grass")
+                        _selectedItem.SeedLampwickGrassAdvanceTree();
+                    else if (_selectedItem.Id == "little_white_flower")
+                        _selectedItem.SeedLittleWhiteFlowerAdvanceTree();
+                    else if (_selectedItem.Id == "sweet_bun")
+                        _selectedItem.SeedSweetBunAdvanceTree();
+                    else if (_selectedItem.Id == "big_horn_beast")
+                        _selectedItem.SeedBigHornBeastAdvanceTree();
+                    else if (_selectedItem.Id == "nian_papa")
+                        _selectedItem.SeedNianPapaAdvanceTree();
+                    else if (_selectedItem.Id == "little_spiky_ball")
+                        _selectedItem.SeedLittleSpikyBallAdvanceTree();
+                    else if (_selectedItem.Id == "little_silver_fish")
+                        _selectedItem.SeedLittleSilverFishAdvanceTree();
+                    else if (_selectedItem.Id == "happy_tuotuo")
+                        _selectedItem.SeedHappyTuotuoAdvanceTree();
+                    else if (_selectedItem.Id == "double_tail_snake")
+                        _selectedItem.SeedDoubleTailSnakeAdvanceTree();
+                    else if (_selectedItem.Id == "stick_bug")
+                        _selectedItem.SeedStickBugAdvanceTree();
+                    else if (_selectedItem.Id == "knife_cut")
+                        _selectedItem.SeedKnifeCutAdvanceTree();
+                    else if (_selectedItem.Id == "chainsaw")
+                        _selectedItem.SeedChainsawAdvanceTree();
+                    else if (_selectedItem.Id == "drill")
+                        _selectedItem.SeedDrillAdvanceTree();
+                    else if (_selectedItem.Id == "explosion")
+                        _selectedItem.SeedExplosionAdvanceTree();
+                    else
+                        _selectedItem.SeedDefaultAdvanceTree();
                     EditorUtility.SetDirty(_selectedItem);
                     _selectedSerialized.Update();
                 }
-                EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("upgradeTiers"), new GUIContent("进阶层"), true);
+                EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("path1"), new GUIContent("路径 1"), true);
+                EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("path2"), new GUIContent("路径 2"), true);
+                EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("path1_1"), new GUIContent("路径 1-1"), true);
+                EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("path1_2"), new GUIContent("路径 1-2"), true);
+                EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("path2_1"), new GUIContent("路径 2-1"), true);
+                EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("path2_2"), new GUIContent("路径 2-2"), true);
                 EditorGUILayout.HelpBox(_selectedItem.GetUpgradeSummary(), MessageType.Info);
 
                 EditorGUILayout.Space(6);

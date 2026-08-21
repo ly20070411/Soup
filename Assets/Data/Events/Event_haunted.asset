@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46e9bba326e0c994f9fb0516eb3e9f8c, type: 3}
+  m_Name: Event_haunted
+  m_EditorClassIdentifier: 
+  id: haunted
+  displayName: "\u95F9\u9B3C"
+  description: "\u4E00\u4F4D\u5C0F\u7CBE\u7075\u8BF4\u5BB6\u91CC\u95F9\u9B3C\u4E86\uFF0C\u201C\u6628\u5929\u6211\u5728\u5E8A\u4E0A\u7761\u89C9\uFF0C\u7136\u540E\u5C31\u542C\u5230\u4EC0\u4E48\u58F0\u97F3\uFF0C\u7136\u540E\uFF0C\u7136\u540E\uFF0C\u54C7\u2014\u2014\u201D"
+  category: 0
+  triggerMoment: 2
+  weight: 1
+  canRepeat: 1
+  requiredStageIndex: 0
+  exclusionGroup: 
+  relatedJob: {fileID: 0}
+  options:
+  - label: "\u53BB\u6349\u9B3C\u2014\u2014\u83B7\u5F973\u4E2A\u5458\u5DE5 \u5E7D\u7075"
+    effects:
+    - effectType: 3
+      intValue: 3
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 0}
+      employeeReference: {fileID: 11400000, guid: 6f0f63e80c5a2884ab1d1d6e67a626f2, type: 2}
+      jobReference: {fileID: 0}
+  - label: "\u7EC4\u5EFA\u9B3C\u6740\u961F\u2014\u2014\u83B7\u5F972\u4E2A \u6FC0\u52B1"
+    effects:
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}

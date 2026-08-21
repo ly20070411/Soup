@@ -14,20 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: nian papa
   displayName: "\u9ECF\u722C\u722C"
-  description: "\u8F6F\u4E4E\u4E4E\uFF0C\u9ECF\u5527\u5527\u7684"
-  icon: {fileID: 0}
+  description: "\u8089\u7C7B\uFF0C30\u4EFD\u5F3A\u97E7\u98DF\u6750"
+  icon: {fileID: 21300000, guid: aa8ddbbaa4df1ef438b89bfb55988d11, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   category: 1
   tags:
   - "\u8089\u7C7B"
-  - "\u67D4\u8F6F"
   - "\u5F3A\u97E7"
   price: 0
   rarity: 0
   maxStack: 1
   weight: 1
   stats:
-  - key: "\u67D4\u8F6F\u98DF\u6750"
-    value: 20
   - key: "\u5F3A\u97E7\u98DF\u6750"
-    value: 10
+    value: 30

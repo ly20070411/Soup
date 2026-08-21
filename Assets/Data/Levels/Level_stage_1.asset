@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4ca1afa1d9c6a64fa51f0054198b91d, type: 3}
+  m_Name: Level_stage_1
+  m_EditorClassIdentifier: 
+  id: stage_1
+  displayName: "\u7B2C\u4E00\u5173"
+  description: "\u5728\u9650\u5B9A\u56DE\u5408\u5185\u6512\u591F\u5206\u6570\uFF0C\u5B8C\u6210\u7B2C\u4E00\u5173\u3002"
+  orderIndex: 1
+  targetScore: 30
+  maxTurns: 10

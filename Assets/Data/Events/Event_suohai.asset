@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46e9bba326e0c994f9fb0516eb3e9f8c, type: 3}
+  m_Name: Event_suohai
+  m_EditorClassIdentifier: 
+  id: suohai
+  displayName: "\u55E6\u55E8\uFF01\uFF01\uFF01"
+  description: "\u5C0F\u7CBE\u7075\u4EEC\u4E0D\u77E5\u9053\u4ECE\u54EA\u5F04\u6765\u4E86\u4E00\u79CD\u6563\u53D1\u5947\u5F02\u9999\u5473\u7684\u77F3\u5934\uFF0C\u95FB\u4E00\u95FB\uFF0C\u987F\u65F6\u611F\u89C9\u7CBE\u795E\u8212\u7545\uFF0C\u5DE5\u4F5C\u6548\u7387\u90FD\u63D0\u9AD8\u4E86\uFF0C\u4F46\u4F60\u611F\u89C9\u4ED6\u4EEC\u7684\u7CBE\u795E\u72B6\u6001\u597D\u50CF\u4E0D\u592A\u6B63\u5E38"
+  category: 0
+  triggerMoment: 2
+  weight: 1
+  canRepeat: 1
+  requiredStageIndex: 0
+  exclusionGroup: 
+  relatedJob: {fileID: 0}
+  options:
+  - label: "\u633A\u597D\u7684\uFF0C\u8BA9\u4ED6\u4EEC\u95FB\u5427\u2014\u2014\u83B7\u5F97
+      \u5F02\u9999\u77F3"
+    effects:
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: 014d26416814cc848b96683b20a04c11, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+  - label: "\u4E07\u4E00\u6709\u526F\u4F5C\u7528\u5462\uFF0C\u8FD8\u662F\u8BA9\u4ED6\u4EEC\u522B\u95FB\u4E86\u2014\u2014\u83B7\u5F971\u4E2A
+      \u6FC0\u52B1"
+    effects:
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}

@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac898d106334b3f4781d12f8d5c79a54, type: 3}
+  m_Name: Relic_ghost_urn
+  m_EditorClassIdentifier: 
+  id: ghost_urn
+  displayName: "\u5E7D\u7075\u74EE"
+  description: "\u5E7D\u7075\u7684\u5DE5\u4F5C\u6548\u7387\u52A0 0.2\u3002"
+  icon: {fileID: 0}
+  tint: {r: 1, g: 1, b: 1, a: 1}
+  acquireStage: 1
+  allowMultiple: 0
+  rules:
+  - trigger: 7
+    condition: 0
+    conditionCategory: 99
+    conditionInt: 0
+    conditionIntMax: 0
+    effect: 8
+    floatValue: 0.2
+    intValue: 0
+    amount: 0
+    ingredient: {fileID: 0}
+    material: 0
+    employeeTypeId: ghost
+    linkedRelic: {fileID: 0}

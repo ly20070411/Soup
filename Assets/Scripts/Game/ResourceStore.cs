@@ -27,6 +27,7 @@ namespace Soup.Game
         private int _processed;
         private int _cooked;
         private int _warehouseCapacityBonus;
+        private int _suppressChanged;
 
         public static ResourceStore Instance { get; private set; }
 
@@ -117,6 +118,32 @@ namespace Soup.Game
             RaiseChanged();
         }
 
+        /// <summary>Clear only flavor stocks (spicy / sour / cold / magic).</summary>
+        public void ClearFlavors()
+        {
+            if (_spicy == 0 && _sour == 0 && _cold == 0 && _magic == 0)
+                return;
+            _spicy = _sour = _cold = _magic = 0;
+            RaiseChanged();
+        }
+
+        /// <summary>
+        /// Per-level stocks: raw materials, processed, cooked, and flavors.
+        /// Keeps warehouse capacity bonus from relics / rewards.
+        /// </summary>
+        public void ClearLevelStocks()
+        {
+            if (_soft == 0 && _tough == 0 && _solid == 0
+                && _processed == 0 && _cooked == 0
+                && _spicy == 0 && _sour == 0 && _cold == 0 && _magic == 0)
+                return;
+
+            _soft = _tough = _solid = 0;
+            _processed = _cooked = 0;
+            _spicy = _sour = _cold = _magic = 0;
+            RaiseChanged();
+        }
+
         public void ApplyState(
             int soft, int tough, int solid,
             int spicy, int sour, int cold, int magic,
@@ -134,6 +161,67 @@ namespace Soup.Game
             _cooked = Mathf.Max(0, cooked);
             _warehouseCapacityBonus = warehouseCapacityBonus;
             RaiseChanged();
+        }
+
+        public readonly struct Snapshot
+        {
+            public readonly int Soft;
+            public readonly int Tough;
+            public readonly int Solid;
+            public readonly int Spicy;
+            public readonly int Sour;
+            public readonly int Cold;
+            public readonly int Magic;
+            public readonly int Processed;
+            public readonly int Cooked;
+            public readonly int WarehouseCapacityBonus;
+
+            public Snapshot(
+                int soft, int tough, int solid,
+                int spicy, int sour, int cold, int magic,
+                int processed, int cooked,
+                int warehouseCapacityBonus)
+            {
+                Soft = soft;
+                Tough = tough;
+                Solid = solid;
+                Spicy = spicy;
+                Sour = sour;
+                Cold = cold;
+                Magic = magic;
+                Processed = processed;
+                Cooked = cooked;
+                WarehouseCapacityBonus = warehouseCapacityBonus;
+            }
+        }
+
+        public Snapshot CaptureSnapshot() =>
+            new Snapshot(
+                _soft, _tough, _solid,
+                _spicy, _sour, _cold, _magic,
+                _processed, _cooked,
+                _warehouseCapacityBonus);
+
+        public void RestoreSnapshot(Snapshot snapshot)
+        {
+            _soft = snapshot.Soft;
+            _tough = snapshot.Tough;
+            _solid = snapshot.Solid;
+            _spicy = snapshot.Spicy;
+            _sour = snapshot.Sour;
+            _cold = snapshot.Cold;
+            _magic = snapshot.Magic;
+            _processed = snapshot.Processed;
+            _cooked = snapshot.Cooked;
+            _warehouseCapacityBonus = snapshot.WarehouseCapacityBonus;
+        }
+
+        public void PushSuppressChanged() => _suppressChanged++;
+
+        public void PopSuppressChanged()
+        {
+            if (_suppressChanged > 0)
+                _suppressChanged--;
         }
 
         public void AddWarehouseCapacityBonus(int amount)
@@ -313,6 +401,10 @@ namespace Soup.Game
             RaiseChanged();
         }
 
-        private void RaiseChanged() => Changed?.Invoke();
+        private void RaiseChanged()
+        {
+            if (_suppressChanged > 0) return;
+            Changed?.Invoke();
+        }
     }
 }

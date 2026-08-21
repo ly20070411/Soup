@@ -15,7 +15,7 @@ MonoBehaviour:
   id: hot fruit
   displayName: "\u7206\u8FA3\u679C"
   description: "\u7D20\u98DF\uFF0C\u65E0\u53EF\u7F6E\u7591\u7684\u8FA3\u5473\uFF0C\u4E14\u5F88\u6709\u56BC\u52B2"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 541c3842585d24e46bd491d78bdeed60, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   category: 0
   tags:

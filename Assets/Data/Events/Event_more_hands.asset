@@ -1,0 +1,95 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46e9bba326e0c994f9fb0516eb3e9f8c, type: 3}
+  m_Name: Event_more_hands
+  m_EditorClassIdentifier: 
+  id: more_hands
+  displayName: "\u66F4\u591A\u4EBA\u624B\uFF1F"
+  description: "\u5728\u4E00\u6B21\u5DE5\u4F5C\u540E\uFF0C\u5C0F\u7CBE\u7075\u5168\u90FD\u7D2F\u7684\u762B\u8F6F\u5728\u5730\u3002\u770B\u7740\u4ED6\u4EEC\u7CBE\u75B2\u529B\u5C3D\u7684\u6837\u5B50\uFF0C\u4F5C\u4E3A\u7EC4\u957F\uFF0C\u4F60\u610F\u8BC6\u5230\u5FC5\u987B\u505A\u70B9\u4EC0\u4E48\u3002"
+  category: 0
+  triggerMoment: 2
+  weight: 1
+  canRepeat: 1
+  requiredStageIndex: 0
+  exclusionGroup: 
+  relatedJob: {fileID: 0}
+  options:
+  - label: "\u591A\u53EC\u5524\u4E00\u4E9B\u5C0F\u7CBE\u7075\u2014\u2014\u83B7\u5F975\u4E2A\u5C0F\u7CBE\u7075\uFF0C1\u4E2A
+      \u75B2\u5026"
+    effects:
+    - effectType: 0
+      intValue: 5
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 0}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: d9bcb9665f0332844af2c4a012f51887, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+  - label: "\u6FC0\u52B1\u4ED6\u4EEC\u2014\u2014\u83B7\u5F972\u4E2A \u65CF\u957F\u7684\u6FC0\u52B1"
+    effects:
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+  - label: "\u6740\u9E21\u5106\u7334\u2014\u2014\u5C0F\u7CBE\u7075\u6570\u91CF\u51CF3\uFF0C\u83B7\u5F974\u4E2A\u7EC4\u957F\u7684\u6FC0\u52B1"
+    effects:
+    - effectType: 0
+      intValue: -3
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 0}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}

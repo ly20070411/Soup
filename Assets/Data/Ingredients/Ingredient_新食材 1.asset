@@ -15,7 +15,7 @@ MonoBehaviour:
   id: sweet bun
   displayName: "\u751C\u56E2\u56E2"
   description: "\u51FA\u8089\u7387\u5F88\u9AD8\u7684\u98DF\u6750\uFF0C\u4E0D\u540C\u90E8\u5206\u53EF\u4EE5\u51FA\u4E0D\u540C\u53E3\u611F\u7684\u8089"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 15d22fe52bf93d0428c7a2252f8c40bf, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   category: 1
   tags:

@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64c86bef1f1033f44a1d2445436b005c, type: 3}
+  m_Name: Employee_elf
+  m_EditorClassIdentifier: 
+  id: elf
+  displayName: "\u5C0F\u7CBE\u7075"
+  description: "\u521D\u7EA7\u5458\u5DE5\u5355\u4F4D\uFF0C\u65E0\u7279\u6B8A\u6548\u679C\u3002"
+  icon: {fileID: 21300000, guid: 01112360a0b7f8d4cb231c7d0c6a7698, type: 3}
+  tint: {r: 0.55, g: 0.9, b: 0.55, a: 1}
+  workEfficiency: 1
+  occupiesJobSlot: 1
+  canPlayerAssign: 1
+  lockedJob: {fileID: 0}
+  restrictToJobType: 0
+  allowedJobType: 1
+  consumeOwnProcessedFraction: 0

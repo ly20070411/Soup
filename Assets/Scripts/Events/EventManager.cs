@@ -1,0 +1,540 @@
+using System;
+using System.Collections.Generic;
+using Soup.Game;
+using Soup.Jobs;
+using Soup.Levels;
+using UnityEngine;
+
+namespace Soup.Events
+{
+    /// <summary>
+    /// Runtime event catalog and pending choice queue.
+    /// Stage settle presents 2 events (一般 + optional 进阶专属 with job-upgrade gate).
+    /// </summary>
+    [DefaultExecutionOrder(-95)]
+    public class EventManager : MonoBehaviour
+    {
+        public const string ResourcesDatabasePath = "EventDatabase";
+        public const string ResourcesConfigPath = "GameConfig";
+
+        /// <summary>进阶专属相对一般事件的权重倍率。</summary>
+        public const float AdvancedWeightMultiplier = 3f;
+
+        [SerializeField] private EventDatabase database;
+        [SerializeField] private GameConfig config;
+        [SerializeField] private bool dontDestroyOnLoad = true;
+
+        private readonly List<string> _seenEventIds = new List<string>();
+        private readonly Queue<EventItem> _pendingQueue = new Queue<EventItem>();
+        private EventItem _pendingEvent;
+        /// <summary>Turn index when the last random turn-end event was presented. 0 = never.</summary>
+        private int _lastRandomEventTurn;
+        private bool _stageEventBatchActive;
+
+        public static EventManager Instance { get; private set; }
+
+        public EventDatabase Database => database;
+        public GameConfig Config => config;
+
+        public IReadOnlyList<EventItem> All =>
+            database != null ? database.Events : Array.Empty<EventItem>();
+
+        public EventItem PendingEvent => _pendingEvent;
+
+        public bool HasPendingEvent => _pendingEvent != null;
+
+        public int QueuedEventCount => _pendingQueue.Count;
+
+        public bool HasStageEventBatch => _stageEventBatchActive;
+
+        public int LastRandomEventTurn => _lastRandomEventTurn;
+
+        public bool EnableTurnEndEvents =>
+            config != null ? config.EnableTurnEndEvents : false;
+
+        public float TurnEndEventChance =>
+            config != null ? Mathf.Clamp01(config.TurnEndEventChance) : 0.45f;
+
+        /// <summary>两次随机事件至少间隔的回合数（含冷却窗口）。</summary>
+        public int EventCooldownTurns =>
+            config != null ? Mathf.Max(1, config.EventCooldownTurns) : 3;
+
+        public bool EnableStageEndEvents =>
+            config != null ? config.EnableStageEndEvents : true;
+
+        public int StageEndEventCount =>
+            config != null ? Mathf.Max(0, config.StageEndEventCount) : 2;
+
+        public event Action<EventItem> EventPresented;
+        public event Action<EventItem, int> EventResolved;
+        public event Action PendingCleared;
+        /// <summary>关卡通关事件批次全部选完（或没有可抽事件）时触发。</summary>
+        public event Action StageEventBatchCompleted;
+
+        public static void Initialize(EventDatabase db, GameConfig gameConfig = null)
+        {
+            if (Instance == null)
+            {
+                var go = new GameObject(nameof(EventManager));
+                Instance = go.AddComponent<EventManager>();
+                if (Application.isPlaying)
+                    DontDestroyOnLoad(go);
+            }
+
+            Instance.database = db;
+            if (gameConfig != null)
+                Instance.config = gameConfig;
+            Instance.database?.RebuildIndex();
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void EnsureExists()
+        {
+            if (Instance != null) return;
+            var db = Resources.Load<EventDatabase>(ResourcesDatabasePath);
+            if (db == null) return;
+            var cfg = Resources.Load<GameConfig>(ResourcesConfigPath);
+            Initialize(db, cfg);
+        }
+
+        private void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            Instance = this;
+            if (dontDestroyOnLoad)
+                DontDestroyOnLoad(gameObject);
+
+            if (database == null)
+                database = Resources.Load<EventDatabase>(ResourcesDatabasePath);
+            if (config == null)
+                config = Resources.Load<GameConfig>(ResourcesConfigPath);
+
+            database?.RebuildIndex();
+        }
+
+        private void OnEnable() => EnsureTurnManagerBound();
+
+        private void Start() => EnsureTurnManagerBound();
+
+        private void Update() => EnsureTurnManagerBound();
+
+        private void OnDisable() => UnbindTurnManager();
+
+        private void OnDestroy()
+        {
+            UnbindTurnManager();
+            if (Instance == this)
+                Instance = null;
+        }
+
+        private TurnManager _boundTurns;
+
+        private void EnsureTurnManagerBound()
+        {
+            var turns = TurnManager.Instance;
+            if (turns == _boundTurns) return;
+
+            UnbindTurnManager();
+            if (turns == null) return;
+
+            turns.TurnResolved += OnTurnResolved;
+            _boundTurns = turns;
+        }
+
+        private void UnbindTurnManager()
+        {
+            if (_boundTurns == null) return;
+            _boundTurns.TurnResolved -= OnTurnResolved;
+            _boundTurns = null;
+        }
+
+        public void ResetRun()
+        {
+            _seenEventIds.Clear();
+            _lastRandomEventTurn = 0;
+            _pendingQueue.Clear();
+            _stageEventBatchActive = false;
+            ClearPending(notify: true);
+        }
+
+        public void ApplyState(IList<string> seenEventIds, int lastRandomEventTurn = 0)
+        {
+            _lastRandomEventTurn = Mathf.Max(0, lastRandomEventTurn);
+            _seenEventIds.Clear();
+            if (seenEventIds != null)
+            {
+                for (int i = 0; i < seenEventIds.Count; i++)
+                {
+                    if (!string.IsNullOrWhiteSpace(seenEventIds[i]))
+                        _seenEventIds.Add(seenEventIds[i]);
+                }
+            }
+
+            _pendingQueue.Clear();
+            _stageEventBatchActive = false;
+            ClearPending(notify: true);
+        }
+
+        public IReadOnlyList<string> GetSeenEventIds() => _seenEventIds;
+
+        public EventItem GetById(string id) =>
+            database != null ? database.GetById(id) : null;
+
+        /// <summary>
+        /// Turns remaining before another random turn-end event may roll.
+        /// 0 = ready now.
+        /// </summary>
+        public int GetCooldownTurnsRemaining(int currentTurnIndex = -1)
+        {
+            if (_lastRandomEventTurn <= 0)
+                return 0;
+
+            int turn = currentTurnIndex >= 0
+                ? currentTurnIndex
+                : (TurnManager.Instance != null ? TurnManager.Instance.TurnIndex : 0);
+            int elapsed = turn - _lastRandomEventTurn;
+            int need = EventCooldownTurns;
+            return Mathf.Max(0, need - elapsed);
+        }
+
+        public bool IsRandomEventOnCooldown(int currentTurnIndex = -1) =>
+            GetCooldownTurnsRemaining(currentTurnIndex) > 0;
+
+        /// <summary>Force-present a specific event (debug / scripted). Does not start cooldown.</summary>
+        public bool Present(EventItem eventItem, bool countAsRandomTurnEvent = false)
+        {
+            if (eventItem == null) return false;
+            if (HasPendingEvent)
+            {
+                _pendingQueue.Enqueue(eventItem);
+                return true;
+            }
+
+            return PresentImmediate(eventItem, countAsRandomTurnEvent);
+        }
+
+        public bool PresentById(string id) => Present(GetById(id));
+
+        /// <summary>
+        /// 关卡通关后：抽取至多 <see cref="StageEndEventCount"/> 个事件（至多一个进阶专属），
+        /// 全部选完后触发 <see cref="StageEventBatchCompleted"/>。
+        /// 若无可抽事件，立即触发完成回调。
+        /// </summary>
+        public int PresentStageEvents()
+        {
+            // Avoid stacking another batch while one is already in flight.
+            if (_stageEventBatchActive || HasPendingEvent || _pendingQueue.Count > 0)
+                return _pendingQueue.Count + (HasPendingEvent ? 1 : 0);
+
+            if (!EnableStageEndEvents || database == null || database.Count == 0 || StageEndEventCount <= 0)
+            {
+                NotifyStageEventBatchCompleted();
+                return 0;
+            }
+
+            var picks = PickStageEventPair(StageEndEventCount);
+            if (picks.Count == 0)
+            {
+                NotifyStageEventBatchCompleted();
+                return 0;
+            }
+
+            _stageEventBatchActive = true;
+            for (int i = 0; i < picks.Count; i++)
+                _pendingQueue.Enqueue(picks[i]);
+
+            TryPresentNextFromQueue();
+            return picks.Count;
+        }
+
+        /// <summary>
+        /// Roll for an AfterTurn event using GameConfig chance + cooldown.
+        /// Campaign mode (有关卡) skips this — events only fire after clearing a level.
+        /// </summary>
+        public bool TryPresentAfterTurn()
+        {
+            if (HasPendingEvent || _pendingQueue.Count > 0) return false;
+            if (_stageEventBatchActive) return false;
+
+            var levels = LevelManager.Instance;
+            if (levels != null && levels.HasLevels)
+                return false;
+
+            if (!EnableTurnEndEvents) return false;
+            if (database == null || database.Count == 0) return false;
+
+            int turn = TurnManager.Instance != null ? TurnManager.Instance.TurnIndex : 0;
+            if (IsRandomEventOnCooldown(turn))
+                return false;
+
+            if (UnityEngine.Random.value > TurnEndEventChance)
+                return false;
+
+            var pick = PickWeightedFromMoment(EventTriggerMoment.AfterTurn, excludeAdvancedIfAnyPicked: false, alreadyPickedAdvanced: false, exclude: null);
+            return Present(pick, countAsRandomTurnEvent: true);
+        }
+
+        public bool TryChooseOption(int optionIndex, out string message)
+        {
+            message = string.Empty;
+            if (_pendingEvent == null)
+            {
+                message = "当前没有待选事件";
+                return false;
+            }
+
+            var options = _pendingEvent.Options;
+            if (options == null || optionIndex < 0 || optionIndex >= options.Count)
+            {
+                message = "无效选项";
+                return false;
+            }
+
+            var option = options[optionIndex];
+            if (option == null)
+            {
+                message = "选项为空";
+                return false;
+            }
+
+            var resolved = _pendingEvent;
+            EventEffectRunner.Apply(option);
+
+            MarkEventResolved(resolved);
+
+            _pendingEvent = null;
+            EventResolved?.Invoke(resolved, optionIndex);
+            PendingCleared?.Invoke();
+
+            TryPresentNextFromQueue();
+            TryCompleteStageEventBatch();
+
+            message = $"{resolved.DisplayName}：{option.Label}";
+            return true;
+        }
+
+        private void MarkEventResolved(EventItem resolved)
+        {
+            if (resolved == null) return;
+
+            if (!resolved.CanRepeat && !_seenEventIds.Contains(resolved.Id))
+                _seenEventIds.Add(resolved.Id);
+
+            MarkExclusionGroupSeen(resolved.ExclusionGroup);
+        }
+
+        private void MarkExclusionGroupSeen(string group)
+        {
+            if (string.IsNullOrWhiteSpace(group) || database == null || database.Events == null)
+                return;
+
+            var events = database.Events;
+            for (int i = 0; i < events.Count; i++)
+            {
+                var item = events[i];
+                if (item == null || string.IsNullOrEmpty(item.Id)) continue;
+                if (!string.Equals(item.ExclusionGroup, group, System.StringComparison.Ordinal))
+                    continue;
+                if (!_seenEventIds.Contains(item.Id))
+                    _seenEventIds.Add(item.Id);
+            }
+        }
+
+        public void ClearPending(bool notify = false)
+        {
+            bool hadAnything = _pendingEvent != null || _pendingQueue.Count > 0 || _stageEventBatchActive;
+            if (!hadAnything) return;
+            _pendingEvent = null;
+            _pendingQueue.Clear();
+            _stageEventBatchActive = false;
+            if (notify)
+                PendingCleared?.Invoke();
+        }
+
+        private void OnTurnResolved(TurnResult _)
+        {
+            TryPresentAfterTurn();
+        }
+
+        private void TryCompleteStageEventBatch()
+        {
+            if (!_stageEventBatchActive) return;
+            if (_pendingEvent != null || _pendingQueue.Count > 0) return;
+            _stageEventBatchActive = false;
+            NotifyStageEventBatchCompleted();
+        }
+
+        private void NotifyStageEventBatchCompleted()
+        {
+            StageEventBatchCompleted?.Invoke();
+        }
+
+        private bool PresentImmediate(EventItem eventItem, bool countAsRandomTurnEvent)
+        {
+            if (eventItem == null) return false;
+
+            _pendingEvent = eventItem;
+            if (countAsRandomTurnEvent)
+            {
+                int turn = TurnManager.Instance != null ? TurnManager.Instance.TurnIndex : 0;
+                _lastRandomEventTurn = Mathf.Max(1, turn);
+            }
+
+            EventPresented?.Invoke(eventItem);
+            return true;
+        }
+
+        private bool TryPresentNextFromQueue()
+        {
+            if (HasPendingEvent) return false;
+            while (_pendingQueue.Count > 0)
+            {
+                var next = _pendingQueue.Dequeue();
+                if (next == null) continue;
+                return PresentImmediate(next, countAsRandomTurnEvent: false);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Pick up to <paramref name="count"/> AfterStage events.
+        /// Advanced exclusive weight ×3 when related job upgraded ≥1; at most one advanced in the set.
+        /// </summary>
+        private List<EventItem> PickStageEventPair(int count)
+        {
+            var result = new List<EventItem>(count);
+            var exclude = new HashSet<EventItem>();
+            bool pickedAdvanced = false;
+
+            for (int n = 0; n < count; n++)
+            {
+                var pick = PickWeightedFromMoment(
+                    EventTriggerMoment.AfterStage,
+                    excludeAdvancedIfAnyPicked: true,
+                    alreadyPickedAdvanced: pickedAdvanced,
+                    exclude: exclude);
+
+                if (pick == null)
+                    break;
+
+                result.Add(pick);
+                exclude.Add(pick);
+                if (pick.IsAdvancedExclusive)
+                    pickedAdvanced = true;
+            }
+
+            return result;
+        }
+
+        private EventItem PickWeightedFromMoment(
+            EventTriggerMoment moment,
+            bool excludeAdvancedIfAnyPicked,
+            bool alreadyPickedAdvanced,
+            HashSet<EventItem> exclude)
+        {
+            if (database == null) return null;
+
+            var pool = database.FindByTrigger(moment);
+            float total = 0f;
+            for (int i = 0; i < pool.Count; i++)
+            {
+                var item = pool[i];
+                if (!IsEligibleForPick(item, excludeAdvancedIfAnyPicked, alreadyPickedAdvanced, exclude))
+                    continue;
+                total += GetEffectiveWeight(item);
+            }
+
+            if (total <= 0f) return null;
+
+            float roll = UnityEngine.Random.Range(0f, total);
+            float cursor = 0f;
+            for (int i = 0; i < pool.Count; i++)
+            {
+                var item = pool[i];
+                if (!IsEligibleForPick(item, excludeAdvancedIfAnyPicked, alreadyPickedAdvanced, exclude))
+                    continue;
+                cursor += GetEffectiveWeight(item);
+                if (roll <= cursor)
+                    return item;
+            }
+
+            for (int i = pool.Count - 1; i >= 0; i--)
+            {
+                if (IsEligibleForPick(pool[i], excludeAdvancedIfAnyPicked, alreadyPickedAdvanced, exclude))
+                    return pool[i];
+            }
+
+            return null;
+        }
+
+        private float GetEffectiveWeight(EventItem item)
+        {
+            if (item == null) return 0f;
+            float w = Mathf.Max(0f, item.Weight);
+            if (item.IsAdvancedExclusive)
+                w *= AdvancedWeightMultiplier;
+            return w;
+        }
+
+        private bool IsEligibleForPick(
+            EventItem item,
+            bool excludeAdvancedIfAnyPicked,
+            bool alreadyPickedAdvanced,
+            HashSet<EventItem> exclude)
+        {
+            if (!IsEligibleBase(item)) return false;
+            if (exclude != null && exclude.Contains(item)) return false;
+
+            if (item.IsAdvancedExclusive)
+            {
+                if (excludeAdvancedIfAnyPicked && alreadyPickedAdvanced)
+                    return false;
+                if (!IsAdvancedJobUnlocked(item))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsAdvancedJobUnlocked(EventItem item)
+        {
+            if (item == null || item.RelatedJob == null)
+                return false;
+
+            var progression = JobProgressionManager.Instance;
+            if (progression == null) return false;
+            return progression.GetUpgradeLevel(item.RelatedJob) >= 1;
+        }
+
+        private bool IsEligibleBase(EventItem item)
+        {
+            if (item == null) return false;
+            if (item.Options == null || item.Options.Count == 0) return false;
+            if (item.Weight <= 0f) return false;
+            if (!item.CanRepeat && _seenEventIds.Contains(item.Id))
+                return false;
+            if (!IsStageRequirementMet(item))
+                return false;
+            return true;
+        }
+
+        private static bool IsStageRequirementMet(EventItem item)
+        {
+            if (item == null || item.RequiredStageIndex <= 0)
+                return true;
+
+            var levels = LevelManager.Instance;
+            if (levels == null || !levels.HasLevels)
+                return false;
+
+            // PresentStageEvents runs after a level clear; LevelsClearedCount is the stage just cleared.
+            return levels.LevelsClearedCount == item.RequiredStageIndex;
+        }
+    }
+}

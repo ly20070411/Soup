@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46e9bba326e0c994f9fb0516eb3e9f8c, type: 3}
+  m_Name: Event_penguin_gather
+  m_EditorClassIdentifier: 
+  id: penguin_gather
+  displayName: "\u51D1\u4F01\u9E45"
+  description: "\u4E00\u4E2A\u957F\u5F97\u5947\u602A\u8111\u888B\uFF0C\u9ED1\u76AE\u767D\u8179\u7684\u602A\u5F02\u751F\u7269\u51FA\u73B0\u5728\u4E86\u4F60\u9762\u524D\uFF0C\u5634\u91CC\u4E00\u76F4\u5728\u53EB\u56B7\u7740\u5947\u602A\u7684\u53E5\u5B50\uFF1A\u201C\u5495\u5495\u560E\u560E\uFF1F\u5495\u5495\u560E\u560E\uFF1F\u201D\n\u4F60\u7A81\u7136\u6709\u4E86\u5F00\u8154\u7684\u6B32\u671B"
+  category: 0
+  triggerMoment: 2
+  weight: 1
+  canRepeat: 0
+  requiredStageIndex: 2
+  exclusionGroup: 
+  relatedJob: {fileID: 0}
+  options:
+  - label: "\u201C\u5495\u5495\u560E\u560E\uFF01\u201D\u2014\u2014\u83B7\u5F97 \u51D1\u4F01\u9E45\u7684\u795D\u798F"
+    effects:
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: a82c928a895598142acb79609e9e4985, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+  - label: "\u201C\u54C8\u57FA\u7C73\u5575\u5357\u5317\u7EFF\u8C46~\u201D\u2014\u2014\u83B7\u5F97
+      \u5357\u5317\u7EFF\u8C46"
+    effects:
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: 8576dfeabb455c44497e860e6575cd4b, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+  - label: "\u201C\u5494\u5494\u2014\u2014\u201D\u2014\u2014\u83B7\u5F97 \u4EEA\u5F0F"
+    effects:
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: 4c30b694887a2ee46a29e49c6070982a, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}

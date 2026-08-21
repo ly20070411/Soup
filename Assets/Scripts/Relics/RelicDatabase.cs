@@ -90,7 +90,7 @@ namespace Soup.Relics
             for (int i = 0; i < relics.Count; i++)
             {
                 var item = relics[i];
-                if (item != null && item.AcquireStage == stage)
+                if (item != null && RelicAcquireStageUtil.MatchesStageFilter(item.AcquireStage, stage))
                     result.Add(item);
             }
 

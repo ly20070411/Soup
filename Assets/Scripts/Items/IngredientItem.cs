@@ -134,6 +134,26 @@ namespace Soup.Items
             stats.Add(new IngredientStatEntry(key, value));
         }
 
+        /// <summary>Replace all gameplay stats (used by design-table seeders).</summary>
+        public void ClearStats()
+        {
+            if (stats == null)
+                stats = new List<IngredientStatEntry>();
+            else
+                stats.Clear();
+        }
+
+        public void SetStats(params (string key, float value)[] entries)
+        {
+            ClearStats();
+            if (entries == null) return;
+            for (int i = 0; i < entries.Length; i++)
+            {
+                if (string.IsNullOrWhiteSpace(entries[i].key)) continue;
+                stats.Add(new IngredientStatEntry(entries[i].key.Trim(), entries[i].value));
+            }
+        }
+
         public void EnsureDefaultIdFromName()
         {
             if (!string.IsNullOrWhiteSpace(id)) return;

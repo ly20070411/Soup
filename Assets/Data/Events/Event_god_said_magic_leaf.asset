@@ -1,0 +1,125 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46e9bba326e0c994f9fb0516eb3e9f8c, type: 3}
+  m_Name: Event_god_said_magic_leaf
+  m_EditorClassIdentifier: 
+  id: god_said_magic_leaf
+  displayName: "\u795E\u8BF4\uFF0C\u8981\u6709\u9B54\u6CD5\u53F6"
+  description: "\u4F60\u770B\u5230\u4E00\u7FA4\u5C0F\u7CBE\u7075\u56F4\u7740\u9B54\u6CD5\u53F6\u8DF3\u821E\uFF0C\u5634\u91CC\u53FD\u91CC\u5495\u565C\u4E0D\u77E5\u9053\u8BF4\u4EC0\u4E48\uFF0C\u4ED6\u4EEC\u80AF\u5B9A\u662F\u88AB\u8FD9\u8BE5\u6B7B\u7684\u53F6\u5B50\u86CA\u60D1\u4E86\u3002"
+  category: 1
+  triggerMoment: 2
+  weight: 1
+  canRepeat: 1
+  requiredStageIndex: 0
+  exclusionGroup: 
+  relatedJob: {fileID: 11400000, guid: 4de9c3090001dd241b9ecc5fa7b16a87, type: 2}
+  options:
+  - label: "\u5F02\u7AEF\uFF01\u51C0\u5316\uFF01\u2014\u2014\u6C38\u4E45\u5931\u53BB\u9B54\u6CD5\u53F6\u91C7\u96C6\u5C97\u4F4D\uFF0C\u83B7\u5F975\u4E2A
+      \u6FC0\u52B1"
+    effects:
+    - effectType: 10
+      intValue: 0
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 0}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 11400000, guid: 4de9c3090001dd241b9ecc5fa7b16a87, type: 2}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+  - label: "\u4E8E\u662F\u5C31\u6709\u4E86\u9B54\u6CD5\u53F6\u2014\u2014\u9B54\u6CD5\u53F6\u53EF\u4EE5\u540C\u65F6\u751F\u4EA7\u56DB\u79CD\u98CE\u5473\uFF0C\u83B7\u5F975\u4E2A
+      \u75B2\u5026"
+    effects:
+    - effectType: 9
+      intValue: 0
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 0}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 11400000, guid: 4de9c3090001dd241b9ecc5fa7b16a87, type: 2}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: d9bcb9665f0332844af2c4a012f51887, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: d9bcb9665f0332844af2c4a012f51887, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: d9bcb9665f0332844af2c4a012f51887, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: d9bcb9665f0332844af2c4a012f51887, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: d9bcb9665f0332844af2c4a012f51887, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+  - label: "\u628A\u4ED6\u4EEC\u5168\u90E8\u6253\u4E00\u987F\u2014\u2014\u83B7\u5F971\u4E2A
+      \u6FC0\u52B1"
+    effects:
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}

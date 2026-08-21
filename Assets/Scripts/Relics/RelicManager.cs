@@ -13,6 +13,8 @@ namespace Soup.Relics
     public class RelicManager : MonoBehaviour
     {
         public const string ResourcesDatabasePath = "RelicDatabase";
+        public const string IncentiveId = "incentive";
+        public const string FatigueId = "fatigue";
 
         [SerializeField] private RelicDatabase database;
         [SerializeField] private bool dontDestroyOnLoad = true;
@@ -110,7 +112,7 @@ namespace Soup.Relics
         {
             _owned.Clear();
             _previousUnusedWarehouse = 0;
-            // Starting relics are chosen once via the main-menu popup (GameSessionLaunch).
+            // New Game no longer grants a starting relic; shop / events supply them.
         }
 
         /// <summary>Debug helper: grant every Starting-stage relic (not used by normal New Game).</summary>
@@ -250,10 +252,17 @@ namespace Soup.Relics
             database != null ? database.FindByStage(stage) : new List<RelicItem>();
 
         /// <summary>
-        /// Build a random offer of unowned relics, preferring <paramref name="preferredStage"/>,
-        /// then filling from other stages if needed. Starting relics are never offered.
+        /// Build a random offer of relics for <paramref name="preferredStage"/>.
+        /// Unique relics already owned are skipped; <see cref="RelicItem.AllowMultiple"/>
+        /// relics (e.g. 激励) can appear again and stack.
+        /// When <paramref name="fillFromOtherStages"/> is true and the preferred pool
+        /// is short, remaining slots are filled from other stages (used by event rewards).
+        /// Shop should pass false so only shop relics appear.
         /// </summary>
-        public List<RelicItem> CreateOffer(int count, RelicAcquireStage preferredStage)
+        public List<RelicItem> CreateOffer(
+            int count,
+            RelicAcquireStage preferredStage,
+            bool fillFromOtherStages = true)
         {
             var result = new List<RelicItem>(Mathf.Max(0, count));
             if (count <= 0 || database == null) return result;
@@ -264,21 +273,24 @@ namespace Soup.Relics
             for (int i = 0; i < all.Count; i++)
             {
                 var relic = all[i];
-                if (relic == null || _owned.Contains(relic)) continue;
-                if (relic.AcquireStage == RelicAcquireStage.Starting) continue;
-                if (relic.AcquireStage == preferredStage)
+                if (relic == null) continue;
+                if (!relic.AllowMultiple && _owned.Contains(relic)) continue;
+                if (RelicAcquireStageUtil.MatchesStageFilter(relic.AcquireStage, preferredStage))
                     preferred.Add(relic);
-                else
+                else if (fillFromOtherStages)
                     others.Add(relic);
             }
 
             Shuffle(preferred);
-            Shuffle(others);
-
             for (int i = 0; i < preferred.Count && result.Count < count; i++)
                 result.Add(preferred[i]);
-            for (int i = 0; i < others.Count && result.Count < count; i++)
-                result.Add(others[i]);
+
+            if (fillFromOtherStages && result.Count < count)
+            {
+                Shuffle(others);
+                for (int i = 0; i < others.Count && result.Count < count; i++)
+                    result.Add(others[i]);
+            }
 
             return result;
         }

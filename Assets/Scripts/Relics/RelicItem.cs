@@ -21,7 +21,9 @@ namespace Soup.Relics
         [SerializeField] private Color tint = Color.white;
 
         [Header("Progression")]
-        [SerializeField] private RelicAcquireStage acquireStage = RelicAcquireStage.Starting;
+        [SerializeField] private RelicAcquireStage acquireStage = RelicAcquireStage.Shop;
+        [Tooltip("可重复获得：商店/奖励池在已持有时仍可再次出现，效果按持有件数叠加。")]
+        [SerializeField] private bool allowMultiple;
 
         [Header("Rules")]
         [SerializeField] private List<RelicRule> rules = new List<RelicRule>();
@@ -32,6 +34,7 @@ namespace Soup.Relics
         public Sprite Icon => icon;
         public Color Tint => tint;
         public RelicAcquireStage AcquireStage => acquireStage;
+        public bool AllowMultiple => allowMultiple;
         public IReadOnlyList<RelicRule> Rules => rules;
 
         public void SetIdentity(string newId, string newDisplayName)
@@ -47,6 +50,8 @@ namespace Soup.Relics
         public void SetTint(Color value) => tint = value;
 
         public void SetAcquireStage(RelicAcquireStage value) => acquireStage = value;
+
+        public void SetAllowMultiple(bool value) => allowMultiple = value;
 
         public void SetRules(List<RelicRule> value)
         {
@@ -119,6 +124,8 @@ namespace Soup.Relics
             {
                 case RelicAcquireStage.Starting: return "开局获取";
                 case RelicAcquireStage.Event: return "事件获取";
+                case RelicAcquireStage.Shop: return "商店获取";
+                case RelicAcquireStage.StartingAndShop: return "开局/商店获取";
                 default: return stage.ToString();
             }
         }

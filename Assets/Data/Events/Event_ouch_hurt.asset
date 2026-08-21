@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46e9bba326e0c994f9fb0516eb3e9f8c, type: 3}
+  m_Name: Event_ouch_hurt
+  m_EditorClassIdentifier: 
+  id: ouch_hurt
+  displayName: "\u554A\uFF0C\u597D\u75DB\uFF01"
+  description: "\u6709\u4E2A\u5C0F\u7CBE\u7075\u5728\u5C0F\u523A\u7403\u91C7\u96C6\u573A\u91CC\u5531\u6B4C\uFF0C\u5531\u7684\u592A\u96BE\u542C\u4E86\uFF0C\u5C0F\u523A\u7403\u4EEC\u90FD\u6293\u72C2\u4E86\uFF0C\u5F00\u59CB\u653B\u51FB\u5C0F\u7CBE\u7075"
+  category: 1
+  triggerMoment: 2
+  weight: 1
+  canRepeat: 1
+  requiredStageIndex: 0
+  exclusionGroup: 
+  relatedJob: {fileID: 11400000, guid: ec4239a8e5769a443b0029ecd0fb2a05, type: 2}
+  options:
+  - label: "\u628A\u5531\u6B4C\u7684\u4EBA\u6253\u4E00\u987F\u2014\u2014\u5C0F\u523A\u7403\u4EA7\u91CF\u52A010%"
+    effects:
+    - effectType: 6
+      intValue: 0
+      secondaryInt: 0
+      floatValue: 0.1
+      relicReference: {fileID: 0}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 11400000, guid: ec4239a8e5769a443b0029ecd0fb2a05, type: 2}
+  - label: "\u5FC5\u987B\u8BA9\u4F60\u4EEC\u89C1\u8BC6\u4E00\u4E0B\u4EC0\u4E48\u662F\u771F\u6B63\u7684\u97F3\u4E50\u2014\u201450%\u5C0F\u7CBE\u7075\u6570\u91CF\u51CF3\uFF0C50%\u5C0F\u523A\u7403\u4EA7\u91CF\u52A040%"
+    effects:
+    - effectType: 11
+      intValue: -3
+      secondaryInt: 0
+      floatValue: 0.4
+      relicReference: {fileID: 0}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 11400000, guid: ec4239a8e5769a443b0029ecd0fb2a05, type: 2}

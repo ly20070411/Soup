@@ -191,6 +191,8 @@ namespace Soup.Relics.Editor
                 EditorGUILayout.Space(6);
                 EditorGUILayout.LabelField("获取阶段", EditorStyles.boldLabel);
                 EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("acquireStage"), new GUIContent("阶段"));
+                EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("allowMultiple"),
+                    new GUIContent("可重复获得", "勾选后商店/奖励可再次出现，持有多件时效果叠加（如激励每件+0.1效率）"));
 
                 EditorGUILayout.Space(6);
                 EditorGUILayout.LabelField("因果关系规则", EditorStyles.boldLabel);
@@ -221,6 +223,8 @@ namespace Soup.Relics.Editor
             {
                 case RelicAcquireStage.Starting: return new Color(0.25f, 0.55f, 0.30f, 0.8f);
                 case RelicAcquireStage.Event: return new Color(0.30f, 0.35f, 0.70f, 0.8f);
+                case RelicAcquireStage.Shop: return new Color(0.70f, 0.50f, 0.18f, 0.8f);
+                case RelicAcquireStage.StartingAndShop: return new Color(0.20f, 0.50f, 0.48f, 0.8f);
                 default: return new Color(0.2f, 0.2f, 0.2f, 0.5f);
             }
         }
@@ -241,7 +245,7 @@ namespace Soup.Relics.Editor
             }
 
             if (_stageFilter.HasValue)
-                query = query.Where(i => i.AcquireStage == _stageFilter.Value);
+                query = query.Where(i => RelicAcquireStageUtil.MatchesStageFilter(i.AcquireStage, _stageFilter.Value));
 
             return query
                 .OrderBy(i => (int)i.AcquireStage)

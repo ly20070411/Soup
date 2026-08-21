@@ -110,6 +110,8 @@ namespace Soup.Relics
                     return $"每种风味最终倍率+{floatValue:0.##}";
                 case RelicEffectType.DisableSpicyCap:
                     return "热辣倍率无上限";
+                case RelicEffectType.AddSpicyScoreMultiplier:
+                    return $"热辣分数额外+{floatValue:0.##}倍";
                 case RelicEffectType.GrantIngredientPerGather:
                 {
                     string name = ingredient != null ? ingredient.DisplayName : "？";
@@ -139,6 +141,23 @@ namespace Soup.Relics
                 }
                 case RelicEffectType.GrantRawPerRawProduced:
                     return $"每生产{intValue}{MaterialLabel(material)}→+{amount}";
+                case RelicEffectType.GrantRawPerGather:
+                    return $"每采集{intValue}→{MaterialLabel(material)}+{amount}";
+                case RelicEffectType.AddGatherAmountPerWorker:
+                    return $"每种采集物产出份数+{amount}";
+                case RelicEffectType.ReduceWarehouseWaste:
+                    return $"浪费减少{(floatValue * 100f):0.##}%";
+                case RelicEffectType.ConvertWasteToEqualGain:
+                {
+                    int mult = amount > 0 ? amount : 1;
+                    return mult > 1 ? $"浪费变为{mult}倍增加" : "浪费变为等量增加";
+                }
+                case RelicEffectType.AddColdScorePerUnit:
+                    return $"寒冷每份已烹饪+{amount}分";
+                case RelicEffectType.ReduceMagicConsumePercent:
+                    return $"鲜美消耗减少{(floatValue * 100f):0.##}%";
+                case RelicEffectType.OverrideSourTopTierPercent:
+                    return $"酸涩最高档阈值{intValue}%";
                 case RelicEffectType.GrantSoftFromUnusedWarehousePercent:
                     return $"未用仓库×{floatValue:0.##}→柔软";
                 case RelicEffectType.ChanceGrantRandomRaw:

@@ -80,6 +80,7 @@ namespace Soup.Relics.Editor
                 case RelicEffectType.AddFinalMultiplierPerPresentFlavor:
                 case RelicEffectType.AddGlobalLaborEfficiency:
                 case RelicEffectType.MultiplyIndependentScore:
+                case RelicEffectType.AddSpicyScoreMultiplier:
                     y = DrawProp(position.x, y, w, floatValue, "数值");
                     break;
                 case RelicEffectType.AddEmployeeTypeLaborEfficiency:
@@ -108,6 +109,11 @@ namespace Soup.Relics.Editor
                     y = DrawProp(position.x, y, w, intValue, "每生产份数");
                     y = DrawProp(position.x, y, w, amount, "额外产出");
                     break;
+                case RelicEffectType.GrantRawPerGather:
+                    y = DrawProp(position.x, y, w, material, "材质");
+                    y = DrawProp(position.x, y, w, intValue, "每采集份数");
+                    y = DrawProp(position.x, y, w, amount, "产出份数");
+                    break;
                 case RelicEffectType.GrantSoftFromUnusedWarehousePercent:
                     y = DrawProp(position.x, y, w, floatValue, "仓库空位比例");
                     break;
@@ -118,6 +124,12 @@ namespace Soup.Relics.Editor
                 case RelicEffectType.GrantEmployeeOnElfLoss:
                     y = DrawProp(position.x, y, w, amount, "每损失授予数量");
                     y = DrawProp(position.x, y, w, employeeTypeId, "员工类型Id");
+                    break;
+                case RelicEffectType.AddGatherAmountPerWorker:
+                    y = DrawProp(position.x, y, w, amount, "产出份数加成");
+                    break;
+                case RelicEffectType.ReduceWarehouseWaste:
+                    y = DrawProp(position.x, y, w, floatValue, "浪费减少比例");
                     break;
             }
 
@@ -162,11 +174,14 @@ namespace Soup.Relics.Editor
                 case RelicEffectType.AddFinalMultiplierPerPresentFlavor:
                 case RelicEffectType.AddGlobalLaborEfficiency:
                 case RelicEffectType.MultiplyIndependentScore:
+                case RelicEffectType.AddSpicyScoreMultiplier:
                 case RelicEffectType.ModifyWarehouseCapacity:
                 case RelicEffectType.AddProcessed:
                 case RelicEffectType.ModifyElfCount:
                 case RelicEffectType.GrantLinkedRelic:
                 case RelicEffectType.GrantSoftFromUnusedWarehousePercent:
+                case RelicEffectType.AddGatherAmountPerWorker:
+                case RelicEffectType.ReduceWarehouseWaste:
                     return 1;
                 case RelicEffectType.AddEmployeeTypeLaborEfficiency:
                 case RelicEffectType.AddRawMaterial:
@@ -175,6 +190,7 @@ namespace Soup.Relics.Editor
                     return 2;
                 case RelicEffectType.GrantIngredientPerGather:
                 case RelicEffectType.GrantRawPerRawProduced:
+                case RelicEffectType.GrantRawPerGather:
                     return 3;
                 default:
                     return 0;

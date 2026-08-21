@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46e9bba326e0c994f9fb0516eb3e9f8c, type: 3}
+  m_Name: Event_two_monsters
+  m_EditorClassIdentifier: 
+  id: two_monsters
+  displayName: "\u8FD9\u662F\u5C0F\u7CBE\u7075\u9996\u6B21\u540C\u65F6\u5BF9\u6218\u4E24\u53EA\u602A\u517D"
+  description: "\u4E24\u53EA\u5DE8\u5927\u7684\u5431\u5431\u95EF\u5165\u4E86\u6211\u4EEC\u7684\u53A8\u623F\uFF0C\u6B8B\u5FCD\u7684\u5403\u6389\u4E86\u6211\u4EEC\u7684\u98DF\u6750\uFF0C\u5FC5\u987B\u8981\u8BA9\u4ED6\u4EEC\u4ED8\u51FA\u4EE3\u4EF7\u3002"
+  category: 0
+  triggerMoment: 2
+  weight: 1
+  canRepeat: 1
+  requiredStageIndex: 0
+  exclusionGroup: 
+  relatedJob: {fileID: 0}
+  options:
+  - label: "\u628A\u4ED6\u4EEC\u4E22\u5230\u6C64\u91CC\u53BB\u2014\u2014\u83B7\u5F97
+      \u7096\u716E\u5431\u5431"
+    effects:
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: 3b2218bca52c1d34f9839514f1b87167, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+  - label: "\u628A\u4ED6\u4EEC\u6263\u62BC\u8D77\u6765\uFF0C\u8BA9\u4ED6\u4EEC\u5E72\u6D3B\u2014\u2014\u83B7\u5F972\u4E2A\u5458\u5DE5
+      \u5431\u5431"
+    effects:
+    - effectType: 3
+      intValue: 2
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 0}
+      employeeReference: {fileID: 11400000, guid: 70a50eedfced0b644993a5f42a08de67, type: 2}
+      jobReference: {fileID: 0}

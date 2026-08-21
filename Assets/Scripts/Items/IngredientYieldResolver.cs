@@ -1,4 +1,5 @@
 using System.Text;
+using Soup.Game;
 using UnityEngine;
 
 namespace Soup.Items
@@ -40,6 +41,59 @@ namespace Soup.Items
                 Magic = Magic * units,
                 RandomMaterial = RandomMaterial * units,
                 RandomFlavor = RandomFlavor * units
+            };
+        }
+
+        /// <summary>Scale yield by work efficiency (ceil each component).</summary>
+        public IngredientYield ScaledByEfficiency(float efficiency)
+        {
+            if (efficiency <= 0f)
+                return default;
+            if (Mathf.Approximately(efficiency, 1f))
+                return this;
+
+            return new IngredientYield
+            {
+                Soft = GameMath.CeilMul(Soft, efficiency),
+                Tough = GameMath.CeilMul(Tough, efficiency),
+                Solid = GameMath.CeilMul(Solid, efficiency),
+                Spicy = GameMath.CeilMul(Spicy, efficiency),
+                Sour = GameMath.CeilMul(Sour, efficiency),
+                Cold = GameMath.CeilMul(Cold, efficiency),
+                Magic = GameMath.CeilMul(Magic, efficiency),
+                RandomMaterial = GameMath.CeilMul(RandomMaterial, efficiency),
+                RandomFlavor = GameMath.CeilMul(RandomFlavor, efficiency)
+            };
+        }
+
+        /// <summary>仅缩放风味（含随机风味）。</summary>
+        public IngredientYield ScaledFlavorsBy(float multiplier)
+        {
+            if (multiplier <= 0f)
+            {
+                return new IngredientYield
+                {
+                    Soft = Soft,
+                    Tough = Tough,
+                    Solid = Solid,
+                    RandomMaterial = RandomMaterial
+                };
+            }
+
+            if (Mathf.Approximately(multiplier, 1f))
+                return this;
+
+            return new IngredientYield
+            {
+                Soft = Soft,
+                Tough = Tough,
+                Solid = Solid,
+                RandomMaterial = RandomMaterial,
+                Spicy = GameMath.CeilMul(Spicy, multiplier),
+                Sour = GameMath.CeilMul(Sour, multiplier),
+                Cold = GameMath.CeilMul(Cold, multiplier),
+                Magic = GameMath.CeilMul(Magic, multiplier),
+                RandomFlavor = GameMath.CeilMul(RandomFlavor, multiplier)
             };
         }
 

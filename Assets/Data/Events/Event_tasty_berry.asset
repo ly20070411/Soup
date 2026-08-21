@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46e9bba326e0c994f9fb0516eb3e9f8c, type: 3}
+  m_Name: Event_tasty_berry
+  m_EditorClassIdentifier: 
+  id: tasty_berry
+  displayName: "\u597D\u5403\u7684\u5C0F\u751C\u679C"
+  description: "\u5C0F\u751C\u679C\uFF0C\u597D\u5403\uFF0C\u7231\u5403\uFF0C\u5F53\u4F60\u53D1\u73B0\u7684\u65F6\u5019\uFF0C\u6709\u51E0\u4E2A\u5C0F\u7CBE\u7075\u751A\u81F3\u56E0\u4E3A\u5077\u5403\u7684\u592A\u591A\uFF0C\u8FDE\u8DEF\u90FD\u8D70\u4E0D\u52A8\u4E86"
+  category: 1
+  triggerMoment: 2
+  weight: 1
+  canRepeat: 1
+  requiredStageIndex: 0
+  exclusionGroup: 
+  relatedJob: {fileID: 11400000, guid: f22c50478b3665d40a2654088eb3aefe, type: 2}
+  options:
+  - label: "\u72E0\u72E0\u7684\u60E9\u7F5A\u4ED6\u4EEC\u2014\u2014\u5C0F\u751C\u679C\u4EA7\u91CF\u589E\u52A030%\uFF0C\u83B7\u5F972\u4E2A
+      \u75B2\u5026"
+    effects:
+    - effectType: 6
+      intValue: 0
+      secondaryInt: 0
+      floatValue: 0.3
+      relicReference: {fileID: 0}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 11400000, guid: f22c50478b3665d40a2654088eb3aefe, type: 2}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: d9bcb9665f0332844af2c4a012f51887, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: d9bcb9665f0332844af2c4a012f51887, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+  - label: "\u591A\u5403\u4E00\u70B9\u4E5F\u4E0D\u6015\u2014\u2014\u5C0F\u751C\u679C\u4EA7\u91CF\u51CF20%\uFF0C\u83B7\u5F973\u4E2A
+      \u6FC0\u52B1"
+    effects:
+    - effectType: 6
+      intValue: 0
+      secondaryInt: 0
+      floatValue: -0.2
+      relicReference: {fileID: 0}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 11400000, guid: f22c50478b3665d40a2654088eb3aefe, type: 2}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}

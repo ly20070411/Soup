@@ -60,8 +60,9 @@ namespace Soup.Relics.Editor
                 db,
                 "incentive",
                 "激励",
-                "全局工作效率加 0.1。可重复获得。",
+                "全局工作效率加 0.1。可重复获得，每件叠加。",
                 RelicAcquireStage.Event,
+                allowMultiple: true,
                 rule =>
                 {
                     rule.SetTrigger(RelicTrigger.Passive);
@@ -69,31 +70,31 @@ namespace Soup.Relics.Editor
                     rule.SetEffect(RelicEffectType.AddGlobalLaborEfficiency, 0.1f, 0, 0, null);
                 });
 
-            // —— 开局 ——
+            // —— 原开局，现商店 ——
             CreateOrUpdate(
                 db,
                 "vegetarianism",
                 "素食主义",
-                "若没有肉类食材，最终倍率 +0.6。",
-                RelicAcquireStage.Starting,
+                "若没有肉类食材，最终倍率 +0.4。",
+                RelicAcquireStage.Shop,
                 rule =>
                 {
                     rule.SetTrigger(RelicTrigger.AfterScore);
                     rule.SetCondition(RelicConditionType.NoCategoryGathered, IngredientCategory.Meat, 0);
-                    rule.SetEffect(RelicEffectType.AddFinalMultiplier, 0.6f, 0, 0, null);
+                    rule.SetEffect(RelicEffectType.AddFinalMultiplier, 0.4f, 0, 0, null);
                 });
 
             CreateOrUpdate(
                 db,
                 "no_spice_no_joy",
                 "无辣不欢",
-                "热辣的加成没有上限。",
-                RelicAcquireStage.Starting,
+                "热辣提供的分数额外加 0.5 倍。",
+                RelicAcquireStage.Shop,
                 rule =>
                 {
                     rule.SetTrigger(RelicTrigger.BeforeSpicy);
                     rule.SetCondition(RelicConditionType.Always, IngredientCategory.Other, 0);
-                    rule.SetEffect(RelicEffectType.DisableSpicyCap, 0f, 0, 0, null);
+                    rule.SetEffect(RelicEffectType.AddSpicyScoreMultiplier, 0.5f, 0, 0, null);
                 });
 
             CreateOrUpdate(
@@ -101,7 +102,7 @@ namespace Soup.Relics.Editor
                 "spore_invasion",
                 "孢子入侵",
                 "每采集 5 个采集物，就会产出 1 份蘑菇食材。",
-                RelicAcquireStage.Starting,
+                RelicAcquireStage.Shop,
                 rule =>
                 {
                     rule.SetTrigger(RelicTrigger.AfterGather);
@@ -127,13 +128,13 @@ namespace Soup.Relics.Editor
                 db,
                 "big_warehouse",
                 "大仓库",
-                "仓库存储增加 200。",
-                RelicAcquireStage.Event,
+                "仓库存储增加 4000。",
+                RelicAcquireStage.Shop,
                 rule =>
                 {
                     rule.SetTrigger(RelicTrigger.OnAcquire);
                     rule.SetCondition(RelicConditionType.Always, IngredientCategory.Other, 0);
-                    rule.SetEffect(RelicEffectType.ModifyWarehouseCapacity, 0f, 0, 200, null);
+                    rule.SetEffect(RelicEffectType.ModifyWarehouseCapacity, 0f, 0, 4000, null);
                 });
 
             CreateOrUpdate(
@@ -195,6 +196,7 @@ namespace Soup.Relics.Editor
                 "美味粉",
                 "最终倍率加 0.1。可重复获得。",
                 RelicAcquireStage.Event,
+                allowMultiple: true,
                 rule =>
                 {
                     rule.SetTrigger(RelicTrigger.AfterScore);
@@ -210,6 +212,7 @@ namespace Soup.Relics.Editor
                 "厨房事故",
                 "最终倍率 -0.1。可重复获得。",
                 RelicAcquireStage.Event,
+                allowMultiple: true,
                 rule =>
                 {
                     rule.SetTrigger(RelicTrigger.AfterScore);
@@ -223,6 +226,7 @@ namespace Soup.Relics.Editor
                 "疲倦",
                 "全局工作效率减 0.1。可重复获得。",
                 RelicAcquireStage.Event,
+                allowMultiple: true,
                 rule =>
                 {
                     rule.SetTrigger(RelicTrigger.Passive);
@@ -232,32 +236,58 @@ namespace Soup.Relics.Editor
 
             CreateOrUpdate(
                 db,
+                "abundance_blessing",
+                "丰饶祝福",
+                "每种采集物的产出份数加 1。",
+                RelicAcquireStage.Event,
+                rule =>
+                {
+                    rule.SetTrigger(RelicTrigger.Passive);
+                    rule.SetCondition(RelicConditionType.Always, IngredientCategory.Other, 0);
+                    rule.SetEffect(RelicEffectType.AddGatherAmountPerWorker, 0f, 0, 1, null);
+                });
+
+            CreateOrUpdate(
+                db,
+                "recycler",
+                "回收器",
+                "浪费食材变为增加双倍食材。",
+                RelicAcquireStage.Shop,
+                rule =>
+                {
+                    rule.SetTrigger(RelicTrigger.Passive);
+                    rule.SetCondition(RelicConditionType.Always, IngredientCategory.Other, 0);
+                    rule.SetEffect(RelicEffectType.ConvertWasteToEqualGain, 0f, 0, 2, null);
+                });
+
+            CreateOrUpdate(
+                db,
                 "moss",
                 "苔藓",
-                "回合开始时，获得上一回合未使用仓库数量 10% 的柔软食材。",
+                "回合开始时，获得上一回合未使用仓库数量 8% 的柔软食材。",
                 RelicAcquireStage.Event,
                 rule =>
                 {
                     rule.SetTrigger(RelicTrigger.TurnStart);
                     rule.SetCondition(RelicConditionType.Always, IngredientCategory.Other, 0);
-                    rule.SetEffect(RelicEffectType.GrantSoftFromUnusedWarehousePercent, 0.1f, 0, 0, null);
+                    rule.SetEffect(RelicEffectType.GrantSoftFromUnusedWarehousePercent, 0.08f, 0, 0, null);
                 });
 
             CreateOrUpdate(
                 db,
                 "handle_moss",
                 "处理苔藓",
-                "开局时获得 50 个柔软食物。",
+                "每采集 1 个采集物，获得 1 个柔软食材。",
                 RelicAcquireStage.Event,
                 rule =>
                 {
-                    rule.SetTrigger(RelicTrigger.OnAcquire);
+                    rule.SetTrigger(RelicTrigger.AfterGather);
                     rule.SetCondition(RelicConditionType.Always, IngredientCategory.Other, 0);
                     rule.SetEffect(
-                        RelicEffectType.AddRawMaterial,
+                        RelicEffectType.GrantRawPerGather,
                         0f,
-                        0,
-                        50,
+                        1,
+                        1,
                         null,
                         IngredientMaterial.Soft);
                 });
@@ -266,13 +296,13 @@ namespace Soup.Relics.Editor
                 db,
                 "hero_expedition",
                 "勇者出征",
-                "回合开始时，有 50% 的概率获得随机一种未处理食材 40 份。",
+                "回合开始时，获得随机一种未处理食材 300 份。",
                 RelicAcquireStage.Event,
                 rule =>
                 {
                     rule.SetTrigger(RelicTrigger.TurnStart);
                     rule.SetCondition(RelicConditionType.Always, IngredientCategory.Other, 0);
-                    rule.SetEffect(RelicEffectType.ChanceGrantRandomRaw, 0.5f, 0, 40, null);
+                    rule.SetEffect(RelicEffectType.ChanceGrantRandomRaw, 1f, 0, 300, null);
                 });
 
             CreateOrUpdateMulti(
@@ -317,20 +347,20 @@ namespace Soup.Relics.Editor
                 db,
                 "stewed_zhizhi",
                 "炖煮吱吱",
-                "开局获得 100 处理食材。",
+                "开局获得 800 处理食材。",
                 RelicAcquireStage.Event,
                 rule =>
                 {
                     rule.SetTrigger(RelicTrigger.OnAcquire);
                     rule.SetCondition(RelicConditionType.Always, IngredientCategory.Other, 0);
-                    rule.SetEffect(RelicEffectType.AddProcessed, 0f, 0, 100, null);
+                    rule.SetEffect(RelicEffectType.AddProcessed, 0f, 0, 800, null);
                 });
 
             CreateOrUpdate(
                 db,
                 "penguin_blessing",
                 "凑企鹅的祝福",
-                "每生产 10 个坚固食材，额外获得 1 个坚固食材。",
+                "每生产 5 个坚固食材，额外获得 1 个坚固食材。",
                 RelicAcquireStage.Event,
                 rule =>
                 {
@@ -339,7 +369,7 @@ namespace Soup.Relics.Editor
                     rule.SetEffect(
                         RelicEffectType.GrantRawPerRawProduced,
                         0f,
-                        10,
+                        5,
                         1,
                         null,
                         IngredientMaterial.Solid);
@@ -379,6 +409,46 @@ namespace Soup.Relics.Editor
                         incentive);
                 });
 
+            // —— 表格新增（获取方式未定，先入库供调试 / 商店扩展）——
+            CreateOrUpdate(
+                db,
+                "ice_point",
+                "冰点",
+                "寒冷将处理食材变为已烹饪后，每份已烹饪由 2 分变为 4 分。",
+                RelicAcquireStage.Shop,
+                rule =>
+                {
+                    rule.SetTrigger(RelicTrigger.Passive);
+                    rule.SetCondition(RelicConditionType.Always, IngredientCategory.Other, 0);
+                    rule.SetEffect(RelicEffectType.AddColdScorePerUnit, 0f, 0, 2, null);
+                });
+
+            CreateOrUpdate(
+                db,
+                "tech_and_hardcore",
+                "科技与狠活",
+                "每回合消耗的鲜美总量减少 10%。",
+                RelicAcquireStage.Shop,
+                rule =>
+                {
+                    rule.SetTrigger(RelicTrigger.Passive);
+                    rule.SetCondition(RelicConditionType.Always, IngredientCategory.Other, 0);
+                    rule.SetEffect(RelicEffectType.ReduceMagicConsumePercent, 0.1f, 0, 0, null);
+                });
+
+            CreateOrUpdate(
+                db,
+                "sour_candy",
+                "酸酸糖",
+                "酸涩换算分数最高档的阈值从 10% 变为 20%。",
+                RelicAcquireStage.Shop,
+                rule =>
+                {
+                    rule.SetTrigger(RelicTrigger.Passive);
+                    rule.SetCondition(RelicConditionType.Always, IngredientCategory.Other, 0);
+                    rule.SetEffect(RelicEffectType.OverrideSourTopTierPercent, 0f, 20, 0, null);
+                });
+
             // Keep only seeded relics in database.
             PruneDatabaseToKnown(db);
 
@@ -401,8 +471,10 @@ namespace Soup.Relics.Editor
                 "vegetarianism", "no_spice_no_joy", "spore_invasion",
                 "compound_salt", "big_warehouse", "pure_salt", "ghost_urn", "necronomicon",
                 "delicious_powder", "incentive", "kitchen_accident", "fatigue",
+                "abundance_blessing", "recycler",
                 "moss", "handle_moss", "hero_expedition", "strange_scent_stone",
-                "cruel_delicious", "stewed_zhizhi", "penguin_blessing", "nanbei_ludou", "ritual"
+                "cruel_delicious", "stewed_zhizhi", "penguin_blessing", "nanbei_ludou", "ritual",
+                "ice_point", "tech_and_hardcore", "sour_candy"
             };
 
             var all = new List<RelicItem>(db.Relics);
@@ -436,7 +508,19 @@ namespace Soup.Relics.Editor
             RelicAcquireStage stage,
             System.Action<RelicRule> configureRule)
         {
-            return CreateOrUpdateMulti(db, id, displayName, description, stage, configureRule);
+            return CreateOrUpdateMulti(db, id, displayName, description, stage, false, configureRule);
+        }
+
+        private static RelicItem CreateOrUpdate(
+            RelicDatabase db,
+            string id,
+            string displayName,
+            string description,
+            RelicAcquireStage stage,
+            bool allowMultiple,
+            System.Action<RelicRule> configureRule)
+        {
+            return CreateOrUpdateMulti(db, id, displayName, description, stage, allowMultiple, configureRule);
         }
 
         private static RelicItem CreateOrUpdateMulti(
@@ -445,6 +529,18 @@ namespace Soup.Relics.Editor
             string displayName,
             string description,
             RelicAcquireStage stage,
+            params System.Action<RelicRule>[] configureRules)
+        {
+            return CreateOrUpdateMulti(db, id, displayName, description, stage, false, configureRules);
+        }
+
+        private static RelicItem CreateOrUpdateMulti(
+            RelicDatabase db,
+            string id,
+            string displayName,
+            string description,
+            RelicAcquireStage stage,
+            bool allowMultiple,
             params System.Action<RelicRule>[] configureRules)
         {
             string path = $"{RelicFolder}/Relic_{id}.asset";
@@ -458,6 +554,7 @@ namespace Soup.Relics.Editor
             item.SetIdentity(id, displayName);
             item.SetDescription(description);
             item.SetAcquireStage(stage);
+            item.SetAllowMultiple(allowMultiple);
             item.ClearRules();
 
             if (configureRules != null)

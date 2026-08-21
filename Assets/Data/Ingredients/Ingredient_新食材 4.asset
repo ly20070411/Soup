@@ -15,7 +15,7 @@ MonoBehaviour:
   id: little spiky ball
   displayName: "\u5C0F\u523A\u7403"
   description: "\u62D4\u6389\u523A\u867D\u7136\u9EBB\u70E6\uFF0C\u4F46\u662F\u91CC\u9762\u7684\u4E1C\u897F\u4E00\u5B9A\u8BA9\u4F60\u60CA\u559C"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: f697867ed9495db4f8325d2ab5188250, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   category: 1
   tags:

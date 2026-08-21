@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac898d106334b3f4781d12f8d5c79a54, type: 3}
+  m_Name: Relic_tech_and_hardcore
+  m_EditorClassIdentifier: 
+  id: tech_and_hardcore
+  displayName: "\u79D1\u6280\u4E0E\u72E0\u6D3B"
+  description: "\u6BCF\u56DE\u5408\u6D88\u8017\u7684\u9C9C\u7F8E\u603B\u91CF\u51CF\u5C11
+    10%\u3002"
+  icon: {fileID: 0}
+  tint: {r: 1, g: 1, b: 1, a: 1}
+  acquireStage: 2
+  allowMultiple: 0
+  rules:
+  - trigger: 7
+    condition: 0
+    conditionCategory: 99
+    conditionInt: 0
+    conditionIntMax: 0
+    effect: 22
+    floatValue: 0.1
+    intValue: 0
+    amount: 0
+    ingredient: {fileID: 0}
+    material: 0
+    employeeTypeId: 
+    linkedRelic: {fileID: 0}

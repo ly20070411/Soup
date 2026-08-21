@@ -15,7 +15,7 @@ MonoBehaviour:
   id: sour fruit
   displayName: "\u9752\u9178\u679C"
   description: "\u7D20\u98DF\uFF0C\u9178\u6DA9\u5F00\u80C3"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: bc609bba875655c4c868508b34db4bd5, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   category: 0
   tags:

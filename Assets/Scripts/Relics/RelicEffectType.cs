@@ -46,6 +46,42 @@ namespace Soup.Relics
         /// <summary>
         /// Passive: each lost elf grants amount ghosts (EmployeeTypeId defaults to ghost).
         /// </summary>
-        GrantEmployeeOnElfLoss = 15
+        GrantEmployeeOnElfLoss = 15,
+        /// <summary>
+        /// Every intValue gathered units → grant amount of Material (raw).
+        /// </summary>
+        GrantRawPerGather = 16,
+        /// <summary>
+        /// Before spicy: add floatValue to spicy bonus score multiplier
+        /// (e.g. 0.5 → 热辣加成分 ×1.5).
+        /// </summary>
+        AddSpicyScoreMultiplier = 17,
+        /// <summary>
+        /// Passive: add amount to every gather job's amount-per-worker
+        /// (每种采集物产出份数 +N).
+        /// </summary>
+        AddGatherAmountPerWorker = 18,
+        /// <summary>
+        /// Passive: reduce warehouse overflow waste by floatValue (0.75 = 浪费减少75%).
+        /// </summary>
+        ReduceWarehouseWaste = 19,
+        /// <summary>
+        /// Passive: wasted ingredients convert into processed food × amount
+        /// (amount ≤ 0 treated as 1; 回收器 = 2).
+        /// </summary>
+        ConvertWasteToEqualGain = 20,
+        /// <summary>
+        /// Passive: each cold-cooked unit grants +amount score
+        /// (default 2/份；冰点 amount=2 → 每份 4 分).
+        /// </summary>
+        AddColdScorePerUnit = 21,
+        /// <summary>
+        /// Passive: reduce magic consume rate by floatValue (0.1 = 消耗减少 10%).
+        /// </summary>
+        ReduceMagicConsumePercent = 22,
+        /// <summary>
+        /// Passive: override sour best-tier cooked percent (intValue, e.g. 20 = 前 20%).
+        /// </summary>
+        OverrideSourTopTierPercent = 23
     }
 }

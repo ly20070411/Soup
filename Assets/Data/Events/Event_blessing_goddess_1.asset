@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46e9bba326e0c994f9fb0516eb3e9f8c, type: 3}
+  m_Name: Event_blessing_goddess_1
+  m_EditorClassIdentifier: 
+  id: blessing_goddess_1
+  displayName: "\u795D\u798F\u5973\u795E"
+  description: "\u201C\u4F60\u5C31\u662F\u5C0F\u7CBE\u7075\u7684\u65CF\u957F\u5417\uFF1F\u5F88\u53EF\u7231\u54DF\uFF01\u201D\u56E0\u4E3A\u8EAB\u5F62\u4E30\u6EE1\uFF0C\u9762\u5E26\u5FAE\u7B11\u7684\u5973\u795E\u51FA\u73B0\u5728\u4F60\u9762\u524D\uFF0C\u201C\u5450\u5450~\u6211\u53EF\u4EE5\u7ED9\u4F60\u4EEC\u4E00\u4E2A\u795D\u798F\u54DF\uFF01\u201D"
+  category: 0
+  triggerMoment: 2
+  weight: 1
+  canRepeat: 0
+  requiredStageIndex: 0
+  exclusionGroup: blessing_goddess
+  relatedJob: {fileID: 0}
+  options:
+  - label: "\u6211\u5E0C\u671B\u80FD\u627E\u5230\u66F4\u591A\u91C7\u96C6\u7269\u2014\u2014\u83B7\u5F97
+      \u4E30\u9976\u795D\u798F"
+    effects:
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: 14b336302a0635749a4fb40481ecfbd0, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+  - label: "\u6211\u5E0C\u671B\u624B\u4E0B\u4EBA\u5E72\u52B2\u6EE1\u6EE1\u2014\u2014\u6D88\u9664\u6240\u6709
+      \u75B2\u5026\uFF0C\u83B7\u5F97\u4E00\u4E2A \u6FC0\u52B1"
+    effects:
+    - effectType: 5
+      intValue: 0
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 0}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
+    - effectType: 2
+      intValue: 1
+      secondaryInt: 0
+      floatValue: 0
+      relicReference: {fileID: 11400000, guid: fa541edad8a47d84ea858c4fe84f3b02, type: 2}
+      employeeReference: {fileID: 0}
+      jobReference: {fileID: 0}
