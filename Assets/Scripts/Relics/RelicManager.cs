@@ -281,6 +281,10 @@ namespace Soup.Relics
                     others.Add(relic);
             }
 
+            // 开局必须严格保持三选一的开局池，不用事件遗物补位。
+            if (preferredStage == RelicAcquireStage.Starting)
+                others.Clear();
+
             Shuffle(preferred);
             for (int i = 0; i < preferred.Count && result.Count < count; i++)
                 result.Add(preferred[i]);

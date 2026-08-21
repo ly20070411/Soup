@@ -285,6 +285,27 @@ namespace Soup.Game
             result.SpicyMultiplier = spicyMult;
             result.CookScore = cookAfterSpicy;
             result.ScoreGained += delta;
+            if (spicyUsed > 0)
+                store.ConsumeFlavorUpTo(FlavorType.Spicy, spicyUsed);
+        }
+
+        public static int CalculateSpicyUsage(
+            int availableSpicy,
+            int cookedThisTurn,
+            float spicyMultiplierCap,
+            bool spicyUncapped)
+        {
+            availableSpicy = Mathf.Max(0, availableSpicy);
+            cookedThisTurn = Mathf.Max(0, cookedThisTurn);
+            if (availableSpicy == 0 || cookedThisTurn == 0) return 0;
+            if (spicyUncapped || spicyMultiplierCap <= 0f)
+                return availableSpicy;
+            if (spicyMultiplierCap <= 1f)
+                return 0;
+
+            int requiredForCap = GameMath.CeilToInt(
+                (spicyMultiplierCap - 1f) * cookedThisTurn * 0.5f);
+            return Mathf.Min(availableSpicy, requiredForCap);
         }
 
         /// <summary>

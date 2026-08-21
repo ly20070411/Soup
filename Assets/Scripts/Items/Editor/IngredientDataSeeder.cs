@@ -186,7 +186,7 @@ namespace Soup.Items.Editor
         {
             if (AssetDatabase.IsValidFolder(path)) return;
 
-            string parent = System.IO.Path.GetDirectoryName(path);
+            var parent = System.IO.Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(parent))
             {
                 parent = parent.Replace('\\', '/');
@@ -194,7 +194,7 @@ namespace Soup.Items.Editor
                     EnsureFolder(parent);
             }
 
-            string name = System.IO.Path.GetFileName(path);
+            var name = System.IO.Path.GetFileName(path);
             AssetDatabase.CreateFolder(parent, name);
         }
     }

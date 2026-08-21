@@ -198,6 +198,22 @@ namespace Soup.Items
             return FromIngredient(item).ScaledBy(Mathf.Max(0, units));
         }
 
+        /// <summary>
+        /// True when the ingredient's stats carry exactly one fixed flavor kind
+        /// (e.g. 冰晶果 → 寒冷). Used by event flavor modifiers.
+        /// </summary>
+        public static bool TryGetSingleFlavor(IngredientItem item, out FlavorType flavor)
+        {
+            flavor = FlavorType.Spicy;
+            var yield = FromIngredient(item);
+            int kinds = 0;
+            if (yield.Spicy > 0) { flavor = FlavorType.Spicy; kinds++; }
+            if (yield.Sour > 0) { flavor = FlavorType.Sour; kinds++; }
+            if (yield.Cold > 0) { flavor = FlavorType.Cold; kinds++; }
+            if (yield.Magic > 0) { flavor = FlavorType.Magic; kinds++; }
+            return kinds == 1;
+        }
+
         private static int CeilPositive(float value)
         {
             if (value <= 0f) return 0;
