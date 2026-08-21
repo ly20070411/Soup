@@ -84,7 +84,7 @@ namespace Soup.Game
                 Instance = null;
         }
 
-        public void ResetRun(bool restartLevel = true)
+        public void ResetRun()
         {
             ClearUndoSnapshot();
             _turnIndex = 0;
@@ -96,12 +96,11 @@ namespace Soup.Game
             ClearScoreComposition();
             ResourceStore.Instance?.Clear();
             EmployeeManager.Instance?.ResetRun();
-            JobModifierManager.Instance?.ResetRun();
             ElfManager.Instance?.ResetFromConfig();
             RelicManager.Instance?.ResetRun();
             JobProgressionManager.Instance?.ResetRun();
             EventManager.Instance?.ResetRun();
-            LevelManager.Instance?.ResetRun(restartLevel);
+            LevelManager.Instance?.ResetRun();
             ElfManager.Instance?.ClearAssignments();
         }
 
@@ -1586,24 +1585,6 @@ namespace Soup.Game
     }
 
     [Serializable]
-    public class TurnCapacityPreview
-    {
-        public int GatherRaw;
-        public int GatherFlavor;
-        public int ProcessCapacity;
-        public int CookCapacity;
-        public int CookScoreAtCapacity;
-        public int OverflowRisk;
-
-        public override string ToString()
-        {
-            string overflow = OverflowRisk > 0 ? $"；溢出风险至少 {OverflowRisk}" : string.Empty;
-            return $"产能预览：采集原料 +{GatherRaw} / 风味 +{GatherFlavor}；" +
-                   $"处理最多 {ProcessCapacity}；烹饪最多 {CookCapacity}（基础分上限 {CookScoreAtCapacity}）{overflow}";
-        }
-    }
-
-    [Serializable]
     public class StageSettlementResult
     {
         public int StageIndex;
@@ -1639,7 +1620,6 @@ namespace Soup.Game
         public int CookScoreBase;
         public int CookScore;
         public float SpicyMultiplier = 1f;
-        public int SpicyUsed;
         public float FinalMultiplier = 1f;
         public float IndependentMultiplier = 1f;
         public int ColdUsed;
@@ -1658,7 +1638,7 @@ namespace Soup.Game
                 $"cook {ProcessedConsumed}→{CookedGained}, " +
                 $"score+{ScoreGained} (cook {CookScoreBase}→{CookScore}×{SpicyMultiplier:0.##}, " +
                 $"final×{FinalMultiplier:0.##}×{IndependentMultiplier:0.##}, " +
-                $"spicy used {SpicyUsed}, cold {ColdScore}, sour {SourScore}, magic {MagicScore})";
+                $"cold {ColdScore}, sour {SourScore}, magic {MagicScore})";
         }
     }
 }
