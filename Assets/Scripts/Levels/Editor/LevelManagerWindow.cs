@@ -65,7 +65,8 @@ namespace Soup.Levels.Editor
         private void DrawHelp()
         {
             EditorGUILayout.HelpBox(
-                "每个关卡设定「目标分数」与「最大回合」。\n" +
+                "每个关卡设定「目标分数」「挑战分数（可选）」与「最大回合」。\n" +
+                "挑战分数仅作额外目标展示，不影响通关判定。\n" +
                 "分数按本关开始后的增量计算（含回合用尽后的酸涩结算分）。\n" +
                 "流程：回合用尽 → 结算酸涩 → 达标则关卡间奖励 → 下一关；未达标则失败。\n" +
                 "通关全部关卡即为游戏胜利。列表按「顺序」升序排列。",
@@ -155,7 +156,7 @@ namespace Soup.Levels.Editor
                         EditorStyles.boldLabel);
                     GUI.Label(
                         subRect,
-                        $"目标 {item.TargetScore} 分 / {item.MaxTurns} 回合  |  {item.Id}",
+                        FormatLevelListSubtitle(item),
                         EditorStyles.miniLabel);
                 }
 
@@ -198,6 +199,12 @@ namespace Soup.Levels.Editor
                 EditorGUILayout.PropertyField(
                     _selectedSerialized.FindProperty("maxTurns"),
                     new GUIContent("最大回合", "本关允许的回合数；用尽未达标则失败。"));
+                EditorGUILayout.PropertyField(
+                    _selectedSerialized.FindProperty("challengeScore"),
+                    new GUIContent("挑战分数", "可选。不影响通关，仅作额外目标展示。"));
+                EditorGUILayout.PropertyField(
+                    _selectedSerialized.FindProperty("ultimateChallengeScore"),
+                    new GUIContent("终极挑战分数", "可选（如第五关）。不影响通关，仅作额外目标展示。"));
 
                 if (_selectedSerialized.ApplyModifiedProperties())
                 {
@@ -208,12 +215,31 @@ namespace Soup.Levels.Editor
 
                 EditorGUILayout.Space(10);
                 EditorGUILayout.HelpBox(
-                    $"摘要：在 {_selectedItem.MaxTurns} 回合内获得 {_selectedItem.TargetScore} 分即可通关。\n" +
-                    "第 MaxTurns 回合结束后先结算酸涩，再用含酸涩的分数判定是否达标；达标后进入关卡间。",
+                    $"摘要：在 {_selectedItem.MaxTurns} 回合内获得 {_selectedItem.TargetScore} 分即可通关。" +
+                    (_selectedItem.HasChallengeScore
+                        ? $"\n挑战分数 {_selectedItem.ChallengeScore}（不影响通关判定）。"
+                        : string.Empty) +
+                    (_selectedItem.HasUltimateChallengeScore
+                        ? $"\n终极挑战分数 {_selectedItem.UltimateChallengeScore}（不影响通关判定）。"
+                        : string.Empty) +
+                    "\n第 MaxTurns 回合结束后先结算酸涩，再按热辣倍率乘总分，最后用最终得分判定是否达标；达标后进入关卡间。",
                     MessageType.None);
 
                 EditorGUILayout.EndScrollView();
             }
+        }
+
+        private static string FormatLevelListSubtitle(LevelItem item)
+        {
+            if (item == null)
+                return string.Empty;
+
+            string line = $"目标 {item.TargetScore}";
+            if (item.HasChallengeScore)
+                line += $" / 挑战 {item.ChallengeScore}";
+            if (item.HasUltimateChallengeScore)
+                line += $" / 终极 {item.UltimateChallengeScore}";
+            return $"{line} · {item.MaxTurns} 回合  |  {item.Id}";
         }
 
         private List<LevelItem> GetFiltered()

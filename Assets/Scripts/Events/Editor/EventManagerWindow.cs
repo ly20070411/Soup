@@ -253,7 +253,7 @@ namespace Soup.Events.Editor
                 EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("category"), new GUIContent("类型"));
                 EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("triggerMoment"), new GUIContent("触发时机"));
                 EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("weight"), new GUIContent("权重", "进阶专属抽取时会再 ×3。"));
-                EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("canRepeat"), new GUIContent("可重复出现"));
+                EditorGUILayout.PropertyField(_selectedSerialized.FindProperty("canRepeat"), new GUIContent("可重复出现", "预留跨大关；本大关（整局五关）内运行时一律不重复。"));
                 EditorGUILayout.PropertyField(
                     _selectedSerialized.FindProperty("requiredStageIndex"),
                     new GUIContent("限定关卡", "0 = 任意关；1/2/… = 仅在该关通关后进入抽取池。"));
@@ -281,7 +281,8 @@ namespace Soup.Events.Editor
 
                 EditorGUILayout.Space(10);
                 EditorGUILayout.HelpBox(
-                    "提示：通关事件请把触发时机设为 AfterStage。进阶专属需绑定对应岗位。",
+                    "提示：通关事件请把触发时机设为 AfterStage。进阶专属需绑定对应岗位。\n" +
+                    "同一事件在本大关（整局全部关卡）内只出现一次；新开一局时重置事件池。",
                     MessageType.None);
 
                 EditorGUILayout.EndScrollView();

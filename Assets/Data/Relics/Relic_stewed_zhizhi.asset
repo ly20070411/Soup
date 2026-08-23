@@ -14,13 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: stewed_zhizhi
   displayName: "\u7096\u716E\u5431\u5431"
-  description: "\u5F00\u5C40\u83B7\u5F97 800 \u5904\u7406\u98DF\u6750\u3002"
-  icon: {fileID: 0}
+  description: "\u5F00\u5C40\u83B7\u5F973000\u5904\u7406\u98DF\u6750\u3002"
+  icon: {fileID: 21300000, guid: d5ecc0f5a8a4daa44ad0851a10cacdc6, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 0
   rules:
-  - trigger: 3
+  - trigger: 5
     condition: 0
     conditionCategory: 99
     conditionInt: 0
@@ -28,7 +28,7 @@ MonoBehaviour:
     effect: 6
     floatValue: 0
     intValue: 0
-    amount: 800
+    amount: 3000
     ingredient: {fileID: 0}
     material: 0
     employeeTypeId: 

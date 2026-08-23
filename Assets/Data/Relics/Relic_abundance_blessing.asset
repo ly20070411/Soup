@@ -14,9 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: abundance_blessing
   displayName: "\u4E30\u9976\u795D\u798F"
-  description: "\u6BCF\u79CD\u91C7\u96C6\u7269\u7684\u4EA7\u51FA\u4EFD\u6570\u52A0
-    1\u3002"
-  icon: {fileID: 0}
+  description: "\u6BCF\u79CD\u91C7\u96C6\u7269\u7684\u4EA7\u51FA\u4EFD\u6570\u52A01\u3002"
+  icon: {fileID: 21300000, guid: 8d2713e66f34179489ccd123319ed314, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 0

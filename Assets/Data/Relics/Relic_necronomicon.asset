@@ -15,7 +15,7 @@ MonoBehaviour:
   id: necronomicon
   displayName: "\u6B7B\u7075\u4E66"
   description: "\u83B7\u5F97\u540E\uFF0C\u6BCF\u635F\u5931\u4E00\u4E2A\u5C0F\u7CBE\u7075\uFF0C\u83B7\u5F97\u4E00\u4E2A\u5E7D\u7075\u3002"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: b7a745e235896d74899bc96f3819efd8, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 0

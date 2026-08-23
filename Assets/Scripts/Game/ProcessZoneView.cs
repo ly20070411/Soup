@@ -70,14 +70,7 @@ namespace Soup.Game
 
         public float RecommendedOrthographicSize()
         {
-            if (background == null) return 0f;
-            float height = background.bounds.size.y;
-            float width = background.bounds.size.x;
-            if (height < 0.1f) return 0f;
-            float fromHeight = height * 0.5f;
-            float aspect = Camera.main != null ? Mathf.Max(0.1f, Camera.main.aspect) : (16f / 9f);
-            float fromWidth = (width * 0.5f) / aspect;
-            return Mathf.Max(fromHeight, fromWidth);
+            return ZoneViewFraming.CoverOrthographicSize(background);
         }
 
         public float RecommendedCameraCenterY()

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Soup.Employees;
 using Soup.Game;
+using Soup.Jobs;
 using Soup.Levels;
 using UnityEngine;
 
@@ -15,6 +16,9 @@ namespace Soup.Relics
         public const string ResourcesDatabasePath = "RelicDatabase";
         public const string IncentiveId = "incentive";
         public const string FatigueId = "fatigue";
+        public const string StewedZhizhiId = "stewed_zhizhi";
+        public const int StewedZhizhiProcessedGrant = 3000;
+        public const string LoveTuotuoId = "love_tuotuo";
 
         [SerializeField] private RelicDatabase database;
         [SerializeField] private bool dontDestroyOnLoad = true;
@@ -94,7 +98,6 @@ namespace Soup.Relics
 
         private void TrySubscribeLevel()
         {
-            if (_subscribedLevel) return;
             if (LevelManager.Instance == null) return;
             LevelManager.Instance.LevelStarted -= OnLevelStarted;
             LevelManager.Instance.LevelStarted += OnLevelStarted;
@@ -103,9 +106,38 @@ namespace Soup.Relics
 
         private void OnLevelStarted(LevelItem _)
         {
+            // Prefer ApplyLevelEnterRelicEffects from LevelManager.StartLevelAt (after stock clear).
+            // Keep this as fallback if LevelStarted fires alone.
+        }
+
+        /// <summary>
+        /// 进入关卡、清空本关库存之后调用：检测持有遗物并发放关卡开始补给。
+        /// </summary>
+        public void ApplyLevelEnterRelicEffects()
+        {
+            ApplyStewedZhizhiIfOwned();
             var ctx = BuildImmediateContext();
             ctx.LevelTurnNumber = 1;
             RelicEffectRunner.Run(RelicTrigger.LevelStart, ctx);
+        }
+
+        /// <summary>
+        /// 关卡结束（酸涩结算后、清分/进关卡间前）触发：如升华等。
+        /// </summary>
+        public void ApplyLevelEndRelicEffects()
+        {
+            var ctx = BuildImmediateContext();
+            RelicEffectRunner.Run(RelicTrigger.LevelEnd, ctx);
+        }
+
+        /// <summary>持有炖煮吱吱时，本关开始获得 3000 处理食材。</summary>
+        public void ApplyStewedZhizhiIfOwned()
+        {
+            if (!HasId(StewedZhizhiId)) return;
+            var store = ResourceStore.Instance;
+            if (store == null) return;
+            store.AddProcessed(StewedZhizhiProcessedGrant);
+            GameFloatingToast.Show($"炖煮吱吱：处理食材 +{StewedZhizhiProcessedGrant}", 2.8f);
         }
 
         public void ResetRun()
@@ -184,6 +216,56 @@ namespace Soup.Relics
             return n;
         }
 
+        /// <summary>
+        /// Unique owned relics in first-acquired order (for HUD: one slot per type).
+        /// </summary>
+        public void CopyOwnedUnique(List<RelicItem> into)
+        {
+            if (into == null) return;
+            into.Clear();
+            for (int i = 0; i < _owned.Count; i++)
+            {
+                var relic = _owned[i];
+                if (relic == null) continue;
+                bool seen = false;
+                for (int j = 0; j < into.Count; j++)
+                {
+                    if (into[j] == relic || (into[j] != null && into[j].Id == relic.Id))
+                    {
+                        seen = true;
+                        break;
+                    }
+                }
+
+                if (!seen)
+                    into.Add(relic);
+            }
+        }
+
+        public int CountOwnedUnique()
+        {
+            int n = 0;
+            for (int i = 0; i < _owned.Count; i++)
+            {
+                var relic = _owned[i];
+                if (relic == null) continue;
+                bool seen = false;
+                for (int j = 0; j < i; j++)
+                {
+                    if (_owned[j] == relic || (_owned[j] != null && _owned[j].Id == relic.Id))
+                    {
+                        seen = true;
+                        break;
+                    }
+                }
+
+                if (!seen)
+                    n++;
+            }
+
+            return n;
+        }
+
         public bool HasId(string id)
         {
             if (string.IsNullOrWhiteSpace(id)) return false;
@@ -196,11 +278,14 @@ namespace Soup.Relics
             return false;
         }
 
-        /// <summary>Acquire a relic for this run. Allows stacks (e.g. 疲倦 ×2).</summary>
+        /// <summary>Acquire a relic for this run. Allows stacks when AllowMultiple.</summary>
         public bool Acquire(RelicItem relic)
         {
             if (relic == null)
                 return false;
+            if (!relic.AllowMultiple && (Has(relic) || HasId(relic.Id)))
+                return false;
+
             _owned.Add(relic);
             if (!_grantingAcquireEffects)
                 FireOnAcquire(relic);
@@ -252,6 +337,38 @@ namespace Soup.Relics
             database != null ? database.FindByStage(stage) : new List<RelicItem>();
 
         /// <summary>
+        /// 调试用：重新从 Resources 加载遗物库并重建索引（种子/扫描后无需重开 Play）。
+        /// </summary>
+        public void ReloadDatabaseFromResources()
+        {
+            database = Resources.Load<RelicDatabase>(ResourcesDatabasePath);
+            if (database == null) return;
+            database.RemoveNullEntries();
+            database.MarkDirty();
+            database.RebuildIndex();
+        }
+
+        /// <summary>调试用：全部遗物（可按阶段过滤；null = 全部），按显示名排序。</summary>
+        public List<RelicItem> GetRelicsForDebug(RelicAcquireStage? stageFilter)
+        {
+            var result = new List<RelicItem>();
+            if (database == null) return result;
+            var all = database.Relics;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var item = all[i];
+                if (item == null) continue;
+                if (stageFilter.HasValue
+                    && !RelicAcquireStageUtil.MatchesStageFilter(item.AcquireStage, stageFilter.Value))
+                    continue;
+                result.Add(item);
+            }
+
+            result.Sort((a, b) => string.CompareOrdinal(a.DisplayName, b.DisplayName));
+            return result;
+        }
+
+        /// <summary>
         /// Build a random offer of relics for <paramref name="preferredStage"/>.
         /// Unique relics already owned are skipped; <see cref="RelicItem.AllowMultiple"/>
         /// relics (e.g. 激励) can appear again and stack.
@@ -275,6 +392,10 @@ namespace Soup.Relics
                 var relic = all[i];
                 if (relic == null) continue;
                 if (!relic.AllowMultiple && _owned.Contains(relic)) continue;
+                if (relic.Id == LoveTuotuoId
+                    && (JobProgressionManager.Instance == null
+                        || !JobProgressionManager.Instance.HasUnlockedHappyTuotuoGather()))
+                    continue;
                 if (RelicAcquireStageUtil.MatchesStageFilter(relic.AcquireStage, preferredStage))
                     preferred.Add(relic);
                 else if (fillFromOtherStages)

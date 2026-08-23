@@ -18,26 +18,26 @@ MonoBehaviour:
   category: 0
   triggerMoment: 2
   weight: 1
-  canRepeat: 1
+  canRepeat: 0
   requiredStageIndex: 0
   exclusionGroup: 
   relatedJob: {fileID: 0}
   options:
   - label: "\u547D\u4EE4\u5C0F\u7CBE\u7075\u8FDE\u591C\u6E05\u626B\u2014\u2014\u83B7\u5F972\u4E2A
-      \u53A8\u623F\u4E8B\u6545\uFF0C1\u4E2A \u5904\u7406\u82D4\u85D3"
+      \u75B2\u5026\uFF0C1\u4E2A \u5904\u7406\u82D4\u85D3"
     effects:
     - effectType: 2
       intValue: 1
       secondaryInt: 0
       floatValue: 0
-      relicReference: {fileID: 11400000, guid: 10a59158878c0ca469f2f66c1941e4e5, type: 2}
+      relicReference: {fileID: 11400000, guid: d9bcb9665f0332844af2c4a012f51887, type: 2}
       employeeReference: {fileID: 0}
       jobReference: {fileID: 0}
     - effectType: 2
       intValue: 1
       secondaryInt: 0
       floatValue: 0
-      relicReference: {fileID: 11400000, guid: 10a59158878c0ca469f2f66c1941e4e5, type: 2}
+      relicReference: {fileID: 11400000, guid: d9bcb9665f0332844af2c4a012f51887, type: 2}
       employeeReference: {fileID: 0}
       jobReference: {fileID: 0}
     - effectType: 2

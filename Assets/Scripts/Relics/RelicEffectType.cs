@@ -76,12 +76,62 @@ namespace Soup.Relics
         /// </summary>
         AddColdScorePerUnit = 21,
         /// <summary>
-        /// Passive: reduce magic consume rate by floatValue (0.1 = 消耗减少 10%).
+        /// Passive: absolute reduction to magic consume rate (0.2 = 50%→30%).
         /// </summary>
         ReduceMagicConsumePercent = 22,
         /// <summary>
         /// Passive: override sour best-tier cooked percent (intValue, e.g. 20 = 前 20%).
         /// </summary>
-        OverrideSourTopTierPercent = 23
+        OverrideSourTopTierPercent = 23,
+        /// <summary>
+        /// Passive: override sour second-tier cooked percent ceiling (intValue, e.g. 70 = 至 70%).
+        /// </summary>
+        OverrideSourSecondTierPercent = 34,
+        /// <summary>
+        /// Passive: add floatValue to process-station work efficiency
+        /// (e.g. 0.5 = 处理岗效率 +50%).
+        /// </summary>
+        AddProcessLaborEfficiency = 24,
+        /// <summary>
+        /// OnAcquire: grant amount of EmployeeTypeId (defaults to ghost).
+        /// </summary>
+        GrantEmployee = 25,
+        /// <summary>
+        /// Passive: add floatValue to cook-station work efficiency
+        /// (e.g. 0.5 = 烹饪岗效率 +50%).
+        /// </summary>
+        AddCookLaborEfficiency = 26,
+        /// <summary>
+        /// Passive: waste floatValue of cook output (0.2 = 烹饪产出浪费 20%).
+        /// </summary>
+        AddCookOutputWasteFraction = 27,
+        /// <summary>
+        /// OnAcquire: all unlocked gather jobs act as 快乐坨坨; advance path ids are kept.
+        /// </summary>
+        ConvertAllGatherToHappyTuotuo = 28,
+        /// <summary>
+        /// Passive / OnAcquire: add amount advance charges to gather, process, and cook each
+        /// (施工队 amount=1 → 三区各 +1 次进阶机会).
+        /// </summary>
+        AddAdvanceChargesAllZones = 29,
+        /// <summary>
+        /// TurnEnd: convert floatValue of Tough and Solid into Soft
+        /// (搅拌机 0.75 = 消耗 3/4 强韧与坚固，生成等量柔软).
+        /// </summary>
+        ConvertToughSolidFractionToSoft = 30,
+        /// <summary>
+        /// OnAcquire: present amount AfterStage events immediately (三个问号按钮 amount=3).
+        /// </summary>
+        PresentBonusStageEvents = 31,
+        /// <summary>
+        /// LevelEnd: if owning ≥ intValue elves, remove that many (not counted as loss) and
+        /// grant amount of EmployeeTypeId (default ghost). 升华: intValue=3, amount=4.
+        /// </summary>
+        ConvertElvesToGhosts = 32,
+        /// <summary>
+        /// Passive: add amount to every job that has a worker cap (人满为患 amount=5).
+        /// Jobs with no cap (烹饪) stay unlimited.
+        /// </summary>
+        AddAllJobMaxWorkers = 33
     }
 }

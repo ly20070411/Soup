@@ -41,11 +41,16 @@ namespace Soup.Game
         private GameObject _processStarterPanel;
         private GameObject _levelTunePanel;
         private GameObject _victoryPanel;
+        private GameObject _defeatPanel;
         private Transform _levelTuneListRoot;
         private Button _continueButton;
         private Text _statusText;
         private Text _levelTuneStatusText;
+        private Text _victoryScoreText;
         private Text _victoryBodyText;
+        private Text _defeatScoreText;
+        private Text _defeatBodyText;
+        private Text _defeatTitleText;
         private Canvas _canvas;
         private bool _transitioning;
 
@@ -91,15 +96,29 @@ namespace Soup.Game
         private void Start()
         {
             RefreshContinue();
-            if (GameSessionLaunch.ConsumePendingCampaignVictory())
-                ShowVictoryPanel(true);
+            TryShowPendingResultPanels();
         }
 
         private void OnEnable()
         {
             RefreshContinue();
+            TryShowPendingResultPanels();
+        }
+
+        private void TryShowPendingResultPanels()
+        {
             if (GameSessionLaunch.ConsumePendingCampaignVictory())
+            {
+                ShowDefeatPanel(false);
                 ShowVictoryPanel(true);
+                return;
+            }
+
+            if (GameSessionLaunch.ConsumePendingLevelDefeat(out var defeat))
+            {
+                ShowVictoryPanel(false);
+                ShowDefeatPanel(true, defeat);
+            }
         }
 
         private bool AnyChoicePanelOpen()
@@ -107,7 +126,8 @@ namespace Soup.Game
             return (_gatherStarterPanel != null && _gatherStarterPanel.activeSelf)
                    || (_processStarterPanel != null && _processStarterPanel.activeSelf)
                    || (_levelTunePanel != null && _levelTunePanel.activeSelf)
-                   || (_victoryPanel != null && _victoryPanel.activeSelf);
+                   || (_victoryPanel != null && _victoryPanel.activeSelf)
+                   || (_defeatPanel != null && _defeatPanel.activeSelf);
         }
 
         private void RefreshContinue()
@@ -210,6 +230,7 @@ namespace Soup.Game
 
             if (!show)
             {
+                HoverTooltipHub.HideIfPresent();
                 RefreshContinue();
                 return;
             }
@@ -226,12 +247,8 @@ namespace Soup.Game
 
                 var job = _gatherChoices[i];
                 if (_gatherLabels[i] != null)
-                {
-                    string desc = string.IsNullOrWhiteSpace(job.Description)
-                        ? "采集岗位"
-                        : job.Description;
-                    _gatherLabels[i].text = $"{job.DisplayName}\n{desc}";
-                }
+                    _gatherLabels[i].text = job.DisplayName;
+                BindJobOptionHover(_gatherButtons[i], job);
             }
         }
 
@@ -244,6 +261,7 @@ namespace Soup.Game
 
             if (!show)
             {
+                HoverTooltipHub.HideIfPresent();
                 RefreshContinue();
                 return;
             }
@@ -260,13 +278,19 @@ namespace Soup.Game
 
                 var job = _processChoices[i];
                 if (_processLabels[i] != null)
-                {
-                    string desc = string.IsNullOrWhiteSpace(job.Description)
-                        ? "处理方法"
-                        : job.Description;
-                    _processLabels[i].text = $"{job.DisplayName}\n{desc}";
-                }
+                    _processLabels[i].text = job.DisplayName;
+                BindJobOptionHover(_processButtons[i], job);
             }
+        }
+
+        private static void BindJobOptionHover(Button button, JobItem job)
+        {
+            if (button == null || job == null) return;
+            HoverTooltipText.JobStation(job, out string title, out string body);
+            var tip = button.GetComponent<UiHoverTooltip>();
+            if (tip == null)
+                tip = button.gameObject.AddComponent<UiHoverTooltip>();
+            tip.Bind(title, body);
         }
 
         private void OnGatherStarterChosen(int index)
@@ -395,6 +419,7 @@ namespace Soup.Game
 
             BindExistingWidgets(canvasTf);
             EnsureMenuButtons(freeDraw, systemHud);
+            RemoveDeprecatedMenuButtons(canvasTf);
             EnsureChoicePanels(systemHud);
             BindChoiceWidgets();
 
@@ -506,6 +531,7 @@ namespace Soup.Game
             _processStarterPanel = FindNamed(canvas, "ProcessStarterPanel")?.gameObject;
             _levelTunePanel = FindNamed(canvas, "LevelTunePanel")?.gameObject;
             _victoryPanel = FindNamed(canvas, "VictoryPanel")?.gameObject;
+            _defeatPanel = FindNamed(canvas, "DefeatPanel")?.gameObject;
         }
 
         private void EnsureMenuButtons(Transform freeDraw, Transform systemHud)
@@ -518,13 +544,6 @@ namespace Soup.Game
                 CreateDefaultButtonStack(freeDraw);
 
             var tuneHost = systemHud != null ? systemHud : freeDraw;
-            if (FindHud<Button>(canvas, "LevelTuneBtn") == null)
-            {
-                CreateAnchoredButton(tuneHost, "LevelTuneBtn", "关卡调节",
-                    new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
-                    new Vector2(-48f, -36f), new Vector2(180f, 56f),
-                    null);
-            }
 
             if (_buttonStack == null)
                 _buttonStack = FindNamed(canvas, "ButtonStack")?.gameObject;
@@ -580,6 +599,8 @@ namespace Soup.Game
                 BuildLevelTunePanel(systemHud);
             if (_victoryPanel == null)
                 BuildVictoryPanel(systemHud);
+            if (_defeatPanel == null)
+                BuildDefeatPanel(systemHud);
         }
 
         private void BindChoiceWidgets()
@@ -611,7 +632,17 @@ namespace Soup.Game
             }
 
             if (_victoryPanel != null)
+            {
+                _victoryScoreText = FindHud<Text>(_victoryPanel.transform, "Score");
                 _victoryBodyText = FindHud<Text>(_victoryPanel.transform, "Body");
+            }
+
+            if (_defeatPanel != null)
+            {
+                _defeatTitleText = FindHud<Text>(_defeatPanel.transform, "Title");
+                _defeatScoreText = FindHud<Text>(_defeatPanel.transform, "Score");
+                _defeatBodyText = FindHud<Text>(_defeatPanel.transform, "Body");
+            }
         }
 
         private void BindListeners(Transform canvas)
@@ -619,7 +650,6 @@ namespace Soup.Game
             BindClick(FindHud<Button>(canvas, "StartBtn"), OnStartGame);
             BindClick(FindHud<Button>(canvas, "ContinueBtn"), OnContinueGame);
             BindClick(FindHud<Button>(canvas, "QuitBtn"), OnQuit);
-            BindClick(FindHud<Button>(canvas, "LevelTuneBtn"), OnLevelTuneClicked);
 
             BindClick(_gatherButtons[0], OnGatherOption0);
             BindClick(_gatherButtons[1], OnGatherOption1);
@@ -641,6 +671,12 @@ namespace Soup.Game
 
             if (_victoryPanel != null)
                 BindClick(FindHud<Button>(_victoryPanel.transform, "MenuBtn"), OnVictoryClose);
+
+            if (_defeatPanel != null)
+            {
+                BindClick(FindHud<Button>(_defeatPanel.transform, "RetryBtn"), OnDefeatRetry);
+                BindClick(FindHud<Button>(_defeatPanel.transform, "CloseBtn"), OnDefeatClose);
+            }
         }
 
         private void OnGatherOption0() => OnGatherStarterChosen(0);
@@ -655,6 +691,18 @@ namespace Soup.Game
             if (button == null || action == null) return;
             button.onClick.RemoveListener(action);
             button.onClick.AddListener(action);
+        }
+
+        private static void RemoveDeprecatedMenuButtons(Transform canvas)
+        {
+            HideHudButton(canvas, "LevelTuneBtn");
+        }
+
+        private static void HideHudButton(Transform root, string name)
+        {
+            var tf = FindNamed(root, name);
+            if (tf != null)
+                tf.gameObject.SetActive(false);
         }
 
         private static T FindHud<T>(Transform root, string name) where T : Component
@@ -682,6 +730,7 @@ namespace Soup.Game
             ShowGatherStarterPanel(false);
             ShowProcessStarterPanel(false);
             ShowVictoryPanel(false);
+            ShowDefeatPanel(false);
             ShowLevelTunePanel(true);
         }
 
@@ -701,24 +750,111 @@ namespace Soup.Game
                 _victoryPanel.SetActive(show);
             if (_buttonStack != null)
                 _buttonStack.SetActive(!show && !AnyChoicePanelOpen());
-            if (show && _victoryBodyText != null)
+            if (show)
             {
-                int total = 0;
-                var db = Resources.Load<LevelDatabase>(LevelManager.ResourcesDatabasePath);
-                if (db != null)
+                ApplyVictoryScoreLayout();
+
+                int lastScore = 0;
+                var levels = LevelManager.Instance;
+                if (levels != null)
+                    lastScore = levels.LastFinishedScore;
+
+                if (_victoryPanel != null)
                 {
-                    LevelTuningStore.ApplySavedToDatabase(db);
-                    total = db.GetOrdered().Count;
+                    var box = FindNamed(_victoryPanel.transform, "Box");
+                    var scoreLabel = FindHud<Text>(box != null ? box : _victoryPanel.transform, "ScoreLabel");
+                    if (scoreLabel != null)
+                        scoreLabel.text = "第五关得分";
                 }
 
-                var levels = LevelManager.Instance;
-                if (levels != null && levels.LevelsClearedCount > 0)
-                    _victoryBodyText.text = $"已完成全部 {Mathf.Max(total, levels.LevelsClearedCount)} 关\n恭喜通关！";
-                else
-                    _victoryBodyText.text = total > 0
-                        ? $"已完成全部 {total} 关\n恭喜通关！"
-                        : "恭喜通关！";
+                if (_victoryScoreText != null)
+                    _victoryScoreText.text = lastScore.ToString();
+
+                if (_victoryBodyText != null)
+                {
+                    int total = 0;
+                    var db = Resources.Load<LevelDatabase>(LevelManager.ResourcesDatabasePath);
+                    if (db != null)
+                    {
+                        LevelTuningStore.ApplySavedToDatabase(db);
+                        total = db.GetOrdered().Count;
+                    }
+
+                    if (levels != null && levels.LevelsClearedCount > 0)
+                        _victoryBodyText.text =
+                            $"已完成全部 {Mathf.Max(total, levels.LevelsClearedCount)} 关\n恭喜通关！";
+                    else
+                        _victoryBodyText.text = total > 0
+                            ? $"已完成全部 {total} 关\n恭喜通关！"
+                            : "恭喜通关！";
+                }
             }
+        }
+
+        private void ApplyVictoryScoreLayout()
+        {
+            if (_victoryPanel == null) return;
+            var panelTf = _victoryPanel.transform;
+            var box = FindNamed(panelTf, "Box");
+            if (box == null) return;
+
+            EnsureVictoryScoreLabel(box);
+            EnsureVictoryScoreText(box);
+
+            LayoutVictoryBoxText(FindNamed(box, "ScoreLabel"), new Vector2(0f, -96f), new Vector2(560f, 28f));
+            LayoutVictoryBoxText(FindNamed(box, "Score"), new Vector2(0f, -128f), new Vector2(560f, 72f));
+
+            if (_victoryBodyText == null)
+                _victoryBodyText = FindHud<Text>(box, "Body");
+            if (_victoryBodyText != null)
+                LayoutVictoryBoxText(_victoryBodyText.transform, new Vector2(0f, -208f), new Vector2(560f, 72f));
+
+            var menuBtn = FindNamed(box, "MenuBtn");
+            if (menuBtn != null)
+            {
+                var menuRect = menuBtn.GetComponent<RectTransform>();
+                if (menuRect != null)
+                    menuRect.anchoredPosition = new Vector2(0f, 16f);
+            }
+
+            var boxRect = box.GetComponent<RectTransform>();
+            if (boxRect != null)
+                boxRect.sizeDelta = new Vector2(640f, 420f);
+        }
+
+        private static void EnsureVictoryScoreLabel(Transform box)
+        {
+            if (FindNamed(box, "ScoreLabel") != null) return;
+            var label = CreatePanelText(box, "ScoreLabel",
+                new Vector2(0f, -96f), new Vector2(560f, 28f), 20, FontStyle.Normal);
+            label.alignment = TextAnchor.MiddleCenter;
+            label.color = new Color(0.88f, 0.90f, 0.94f, 1f);
+            label.text = "第五关得分";
+        }
+
+        private void EnsureVictoryScoreText(Transform box)
+        {
+            if (_victoryScoreText != null) return;
+            _victoryScoreText = FindHud<Text>(box, "Score");
+            if (_victoryScoreText != null) return;
+
+            _victoryScoreText = CreatePanelText(box, "Score",
+                new Vector2(0f, -128f), new Vector2(560f, 72f), 56, FontStyle.Bold);
+            _victoryScoreText.alignment = TextAnchor.MiddleCenter;
+            _victoryScoreText.color = new Color(1f, 0.92f, 0.45f, 1f);
+        }
+
+        private static void LayoutVictoryBoxText(Transform element, Vector2 anchoredPos, Vector2 size)
+        {
+            if (element == null) return;
+            var rect = element.GetComponent<RectTransform>();
+            if (rect == null) return;
+
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = anchoredPos;
+            rect.sizeDelta = size;
         }
 
         private void PopulateLevelTuneRows()
@@ -788,6 +924,43 @@ namespace Soup.Game
         {
             ShowVictoryPanel(false);
             RefreshContinue();
+        }
+
+        private void OnDefeatClose()
+        {
+            ShowDefeatPanel(false);
+            RefreshContinue();
+        }
+
+        private void OnDefeatRetry()
+        {
+            if (_transitioning || BlockDissolveTransition.IsBusy) return;
+
+            ShowDefeatPanel(false);
+            _transitioning = true;
+            SetMenuInteractable(false);
+            GameSessionLaunch.RequestNewGame();
+        }
+
+        private void ShowDefeatPanel(bool show, GameSessionLaunch.PendingLevelDefeatInfo info = default)
+        {
+            if (_defeatPanel != null)
+                _defeatPanel.SetActive(show);
+            if (_buttonStack != null)
+                _buttonStack.SetActive(!show && !AnyChoicePanelOpen());
+            if (!show) return;
+
+            if (_defeatTitleText != null)
+                _defeatTitleText.text = "游戏失败";
+            if (_defeatScoreText != null)
+                _defeatScoreText.text = info.Score.ToString();
+            if (_defeatBodyText != null)
+            {
+                string levelName = string.IsNullOrWhiteSpace(info.LevelName) ? "本关" : info.LevelName;
+                _defeatBodyText.text = info.TargetScore > 0
+                    ? $"{levelName} 未达标\n目标 {info.TargetScore} 分"
+                    : $"{levelName} 未达标";
+            }
         }
 
         private static int ParsePositive(string raw, int fallback)
@@ -921,13 +1094,13 @@ namespace Soup.Game
                     $"ProcessOption{i}",
                     $"处理 {i + 1}",
                     new Vector2(0f, y),
-                    new Vector2(700f, 90f),
+                    new Vector2(700f, 110f),
                     null);
                 _processButtons[i] = button;
                 _processLabels[i] = button.transform.Find("Label")?.GetComponent<Text>();
                 if (_processLabels[i] != null)
                 {
-                    _processLabels[i].fontSize = 20;
+                    _processLabels[i].fontSize = 18;
                     _processLabels[i].alignment = TextAnchor.MiddleLeft;
                     var lr = _processLabels[i].GetComponent<RectTransform>();
                     if (lr != null)
@@ -937,7 +1110,7 @@ namespace Soup.Game
                     }
                 }
 
-                y -= 100f;
+                y -= 120f;
             }
 
             CreateWideChoiceButton(
@@ -1046,7 +1219,7 @@ namespace Soup.Game
             boxRect.anchorMin = new Vector2(0.5f, 0.5f);
             boxRect.anchorMax = new Vector2(0.5f, 0.5f);
             boxRect.pivot = new Vector2(0.5f, 0.5f);
-            boxRect.sizeDelta = new Vector2(640f, 360f);
+            boxRect.sizeDelta = new Vector2(640f, 420f);
             var boxImage = box.AddComponent<Image>();
             boxImage.sprite = GameOverlayUI.SharedUiSprite();
             boxImage.color = new Color(0.12f, 0.14f, 0.18f, 0.98f);
@@ -1057,14 +1230,87 @@ namespace Soup.Game
             title.alignment = TextAnchor.MiddleCenter;
             title.color = new Color(1f, 0.92f, 0.45f, 1f);
 
+            var scoreLabel = CreatePanelText(box.transform, "ScoreLabel",
+                new Vector2(0f, -96f), new Vector2(560f, 28f), 20, FontStyle.Normal);
+            scoreLabel.alignment = TextAnchor.MiddleCenter;
+            scoreLabel.color = new Color(0.88f, 0.90f, 0.94f, 1f);
+            scoreLabel.text = "第五关得分";
+
+            _victoryScoreText = CreatePanelText(box.transform, "Score",
+                new Vector2(0f, -128f), new Vector2(560f, 72f), 56, FontStyle.Bold);
+            _victoryScoreText.alignment = TextAnchor.MiddleCenter;
+            _victoryScoreText.color = new Color(1f, 0.92f, 0.45f, 1f);
+
             _victoryBodyText = CreatePanelText(box.transform, "Body",
-                new Vector2(0f, -130f), new Vector2(560f, 100f), 22, FontStyle.Normal);
+                new Vector2(0f, -208f), new Vector2(560f, 72f), 22, FontStyle.Normal);
             _victoryBodyText.alignment = TextAnchor.MiddleCenter;
             _victoryBodyText.color = new Color(0.88f, 0.90f, 0.94f, 1f);
 
             CreateAnchoredButton(box.transform, "MenuBtn", "返回主菜单",
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(0f, 40f), new Vector2(280f, 56f),
+                new Vector2(0f, 16f), new Vector2(280f, 56f),
+                null);
+
+            panelGo.SetActive(false);
+        }
+
+        private void BuildDefeatPanel(Transform parent)
+        {
+            var panelGo = new GameObject("DefeatPanel");
+            panelGo.transform.SetParent(parent, false);
+            _defeatPanel = panelGo;
+
+            var panelRect = panelGo.AddComponent<RectTransform>();
+            panelRect.anchorMin = Vector2.zero;
+            panelRect.anchorMax = Vector2.one;
+            panelRect.offsetMin = Vector2.zero;
+            panelRect.offsetMax = Vector2.zero;
+
+            var dim = panelGo.AddComponent<Image>();
+            dim.sprite = GameOverlayUI.SharedUiSprite();
+            dim.color = new Color(0f, 0f, 0f, 0.62f);
+            dim.raycastTarget = true;
+
+            var box = new GameObject("Box");
+            box.transform.SetParent(panelGo.transform, false);
+            var boxRect = box.AddComponent<RectTransform>();
+            boxRect.anchorMin = new Vector2(0.5f, 0.5f);
+            boxRect.anchorMax = new Vector2(0.5f, 0.5f);
+            boxRect.pivot = new Vector2(0.5f, 0.5f);
+            boxRect.sizeDelta = new Vector2(640f, 420f);
+            var boxImage = box.AddComponent<Image>();
+            boxImage.sprite = GameOverlayUI.SharedUiSprite();
+            boxImage.color = new Color(0.12f, 0.14f, 0.18f, 0.98f);
+
+            _defeatTitleText = CreatePanelText(box.transform, "Title",
+                new Vector2(0f, -40f), new Vector2(560f, 52f), 36, FontStyle.Bold);
+            _defeatTitleText.text = "游戏失败";
+            _defeatTitleText.alignment = TextAnchor.MiddleCenter;
+            _defeatTitleText.color = new Color(1f, 0.55f, 0.45f, 1f);
+
+            var scoreLabel = CreatePanelText(box.transform, "ScoreLabel",
+                new Vector2(0f, -96f), new Vector2(560f, 28f), 20, FontStyle.Normal);
+            scoreLabel.alignment = TextAnchor.MiddleCenter;
+            scoreLabel.color = new Color(0.88f, 0.90f, 0.94f, 1f);
+            scoreLabel.text = "本关得分";
+
+            _defeatScoreText = CreatePanelText(box.transform, "Score",
+                new Vector2(0f, -128f), new Vector2(560f, 72f), 56, FontStyle.Bold);
+            _defeatScoreText.alignment = TextAnchor.MiddleCenter;
+            _defeatScoreText.color = new Color(1f, 0.92f, 0.45f, 1f);
+
+            _defeatBodyText = CreatePanelText(box.transform, "Body",
+                new Vector2(0f, -208f), new Vector2(560f, 72f), 22, FontStyle.Normal);
+            _defeatBodyText.alignment = TextAnchor.MiddleCenter;
+            _defeatBodyText.color = new Color(0.88f, 0.90f, 0.94f, 1f);
+
+            CreateAnchoredButton(box.transform, "RetryBtn", "重新开始",
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(-130f, 16f), new Vector2(220f, 56f),
+                null);
+            CreateAnchoredButton(box.transform, "CloseBtn", "留在主菜单",
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(130f, 16f), new Vector2(220f, 56f),
                 null);
 
             panelGo.SetActive(false);

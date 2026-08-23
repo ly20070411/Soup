@@ -22,6 +22,8 @@ namespace Soup.Game
         private int _score;
         private int _lastTurnCooked;
         private int _lastTurnScore;
+        private int _lastStageSourScore;
+        private float _sourSettleFlashUntil;
         private int _lastWarehouseDelta;
         private bool _lastWarehouseOverflowed;
         private int _stageIndex = 1;
@@ -39,6 +41,8 @@ namespace Soup.Game
         public int Score => _score;
         public int LastTurnCooked => _lastTurnCooked;
         public int LastTurnScore => _lastTurnScore;
+        public int LastStageSourScore => _lastStageSourScore;
+        public bool IsSourSettleFlashing => Application.isPlaying && Time.unscaledTime < _sourSettleFlashUntil;
         public int LastWarehouseDelta => _lastWarehouseDelta;
         public bool LastWarehouseOverflowed => _lastWarehouseOverflowed;
         public int StageIndex => _stageIndex;
@@ -91,6 +95,8 @@ namespace Soup.Game
             _score = 0;
             _lastTurnCooked = 0;
             _lastTurnScore = 0;
+            _lastStageSourScore = 0;
+            _sourSettleFlashUntil = 0f;
             _stageIndex = 1;
             _stageCooked = 0;
             ClearScoreComposition();
@@ -140,6 +146,8 @@ namespace Soup.Game
             _score = 0;
             _lastTurnCooked = 0;
             _lastTurnScore = 0;
+            _lastStageSourScore = 0;
+            _sourSettleFlashUntil = 0f;
             _lastWarehouseDelta = 0;
             _lastWarehouseOverflowed = false;
             _stageIndex = 1;
@@ -179,37 +187,89 @@ namespace Soup.Game
         }
 
         /// <summary>
-        /// 大关结算：酸涩按本关已烹饪食物占比换算分数后消耗。
+        /// 大关结算：换算酸涩得分并推进阶段计数。
         /// </summary>
         public StageSettlementResult SettleStage()
         {
-            var store = ResourceStore.Instance;
+            int sourUsed = 0;
+            int sourScore = TrySettleSourAtStageEnd(out sourUsed);
+
             var result = new StageSettlementResult
             {
                 StageIndex = _stageIndex,
-                CookedInStage = _stageCooked
+                CookedInStage = _stageCooked,
+                SourUsed = sourUsed,
+                SourScore = sourScore,
+                ScoreGained = sourScore,
+                TotalScoreAfter = _score
             };
 
-            if (store != null)
-            {
-                FlavorResolver.ResolveSourForSettlement(
-                    store,
-                    _stageCooked,
-                    out int sourUsed,
-                    out int sourScore);
-                result.SourUsed = sourUsed;
-                result.SourScore = sourScore;
-                result.ScoreGained = sourScore;
-                _score += sourScore;
-                _scoreFromSour += sourScore;
-            }
-
-            result.TotalScoreAfter = _score;
             _stageCooked = 0;
             _stageIndex++;
             ClearUndoSnapshot();
             StageSettled?.Invoke(result);
             return result;
+        }
+
+        /// <summary>
+        /// 大关 / 关底结算酸涩：按当前已烹饪食材总量换算得分（不受其他倍率影响）。
+        /// </summary>
+        public int TrySettleSourAtStageEnd(out int sourUsed)
+        {
+            sourUsed = 0;
+            var store = ResourceStore.Instance;
+            if (store == null) return 0;
+
+            FlavorResolver.ResolveSourForSettlement(store, out sourUsed, out int sourScore);
+            if (sourScore <= 0) return 0;
+
+            _score += sourScore;
+            _scoreFromSour += sourScore;
+            _lastStageSourScore = sourScore;
+            _sourSettleFlashUntil = Time.unscaledTime + 2.5f;
+            return sourScore;
+        }
+
+        /// <summary>
+        /// 关卡最后一回合：按当前热辣倍率乘以本关总分（含酸涩），计入热辣分项。
+        /// </summary>
+        public int TrySettleSpicyAtLevelEnd(out float spicyMultiplier)
+        {
+            spicyMultiplier = 1f;
+            if (_score <= 0) return 0;
+
+            var store = ResourceStore.Instance;
+            if (store == null) return 0;
+
+            var result = new TurnResult();
+            var relicCtx = BuildRelicContext(store, result, new List<GatherTurnOutput>());
+            RelicEffectRunner.Run(RelicTrigger.BeforeSpicy, relicCtx);
+
+            spicyMultiplier = ScoreMultiplierResolver.ComputeSpicyMultiplier(
+                store,
+                store.Cooked,
+                relicCtx.SpicyMultiplierCap,
+                relicCtx.SpicyUncapped,
+                relicCtx.SpicyScoreMultiplierBonus);
+            if (spicyMultiplier <= 1f + 0.0001f) return 0;
+
+            int scoreBefore = _score;
+            int scoreAfter = GameMath.CeilToInt(scoreBefore * spicyMultiplier);
+            int bonus = scoreAfter - scoreBefore;
+            if (bonus <= 0) return 0;
+
+            _score += bonus;
+            _scoreFromSpicy += bonus;
+            return bonus;
+        }
+
+        /// <summary>烹饪区绿色酸涩栏：当前库存可换算的分值。</summary>
+        public int ResolveSourPreviewForHud()
+        {
+            if (IsSourSettleFlashing && _lastStageSourScore > 0)
+                return _lastStageSourScore;
+
+            return FlavorResolver.PreviewSourScore(ResourceStore.Instance);
         }
 
         /// <summary>点击「下一回合」时调用。</summary>
@@ -246,33 +306,21 @@ namespace Soup.Game
             FlavorResolver.ResolveCold(store, result);
             ResolveCook(elves, store, result);
             ApplyEndTurnRawWaste(store, result);
-
-            RelicEffectRunner.Run(RelicTrigger.BeforeSpicy, relicCtx);
-            float spicyMult = ScoreMultiplierResolver.ComputeSpicyMultiplier(
-                store,
-                result.CookedGained,
-                relicCtx.SpicyMultiplierCap,
-                relicCtx.SpicyUncapped,
-                relicCtx.SpicyScoreMultiplierBonus);
-            // 鲜美上限按热辣后、遗物/快乐坨坨前的烹饪分计算。
-            result.CookScore = result.CookScoreBase > 0
-                ? GameMath.CeilToInt(result.CookScoreBase * spicyMult)
-                : 0;
+            RelicEffectRunner.Run(RelicTrigger.TurnEnd, relicCtx);
 
             FlavorResolver.ResolveMagic(elves, store, result);
 
             RelicEffectRunner.Run(RelicTrigger.AfterScore, relicCtx);
-            int cookFinal = ScoreMultiplierResolver.ApplyCookScoreMultipliers(result, relicCtx, spicyMult);
+            int cookFinal = ScoreMultiplierResolver.ApplyCookScoreMultipliers(result, relicCtx);
             result.ScoreGained += cookFinal;
 
-            int cookPart = Mathf.Max(0, result.CookScoreBase);
-            int spicyPart = Mathf.Max(0, cookFinal - result.CookScoreBase);
+            int cookPart = cookFinal;
+            int spicyPart = 0;
             int coldPart = Mathf.Max(0, result.ColdScore);
             int magicPart = Mathf.Max(0, result.MagicScore);
-            int sourPart = Mathf.Max(0, result.SourScore);
 
             AccrueTurnScoreComposition(
-                result.ScoreGained, cookPart, spicyPart, coldPart, magicPart, sourPart);
+                result.ScoreGained, cookPart, spicyPart, coldPart, magicPart, 0);
 
             JobProgressionManager.Instance?.TryGrantEndTurnIncentives();
 
@@ -327,6 +375,48 @@ namespace Soup.Game
                 wouldOverflow = result.RawDiscarded > 0
                     || (store.WarehouseCapacity > 0 && store.TotalRaw >= store.WarehouseCapacity);
                 return store.TotalRaw - rawBefore;
+            }
+            finally
+            {
+                store.RestoreSnapshot(snapshot);
+                store.PopSuppressChanged();
+            }
+        }
+
+        /// <summary>
+        /// 预览本回合「处理食材」净变化（采集→处理→寒冷→烹饪→回合结束），不改写真实状态。
+        /// 供烹饪区指示牌使用。
+        /// </summary>
+        public int PreviewProcessedDelta()
+        {
+            var store = ResourceStore.Instance;
+            var elves = ElfManager.Instance;
+            if (store == null || elves == null)
+                return 0;
+
+            var snapshot = store.CaptureSnapshot();
+            store.PushSuppressChanged();
+            try
+            {
+                int processedBefore = store.Processed;
+                var result = new TurnResult();
+                var gatherOutputs = new List<GatherTurnOutput>();
+                var relicCtx = BuildRelicContext(store, result, gatherOutputs);
+
+                RelicEffectRunner.Run(RelicTrigger.TurnStart, relicCtx);
+                int solidBeforeGather = store.Solid;
+                ResolveGather(elves, store, result, relicCtx, gatherOutputs);
+                relicCtx.SolidProducedThisBatch = Mathf.Max(0, store.Solid - solidBeforeGather);
+                RelicEffectRunner.Run(RelicTrigger.AfterGather, relicCtx);
+                ResolveProcess(elves, store, result);
+                ShrinkGatherOutputsToStore(gatherOutputs, store);
+                EnforceWarehouseCapacity(store, result, gatherOutputs);
+                FlavorResolver.ResolveCold(store, result);
+                ResolveCook(elves, store, result);
+                ApplyEndTurnRawWaste(store, result);
+                RelicEffectRunner.Run(RelicTrigger.TurnEnd, relicCtx);
+
+                return store.Processed - processedBefore;
             }
             finally
             {
@@ -437,6 +527,12 @@ namespace Soup.Game
         {
             var em = EmployeeManager.Instance;
             var gatheredJobs = new List<JobItem>();
+            // 棍棍虫「空仓/囤固」等：本回合采集开始前快照（上回合结算后），
+            // 整回合共用，避免先采集岗位占满仓库导致后采集岗位误判。
+            int turnSnapUnusedSpace = SnapWarehouseSpace(store);
+            int turnSnapWarehouseCapacity = store != null ? store.WarehouseCapacity : 0;
+            int turnSnapSolidStock = store != null ? store.Solid : 0;
+            int turnSnapProcessed = store != null ? Mathf.Max(0, store.Processed) : 0;
             foreach (var pair in GetJobLaborMap())
             {
                 var job = pair.Key;
@@ -457,8 +553,11 @@ namespace Soup.Game
                 var advancePath = JobProgressionManager.Instance != null
                     ? JobProgressionManager.Instance.GetAdvancePath(job)
                     : JobAdvanceNodeId.None;
+                var definition = JobProgressionManager.Instance != null
+                    ? JobProgressionManager.Instance.ResolveGatherDefinition(job)
+                    : job;
                 var advanceMods = JobAdvanceGatherMods.From(job, advancePath);
-                int amountPerWorker = advanceMods.ResolveAmountPerWorker(job)
+                int amountPerWorker = advanceMods.ResolveAmountPerWorker(definition)
                     + RelicEffectRunner.SumGatherAmountPerWorkerBonus();
 
                 int units = GameMath.CeilToInt(workers * (double)amountPerWorker);
@@ -467,16 +566,14 @@ namespace Soup.Game
                     : 1f;
                 if (eventYield > 0f && !Mathf.Approximately(eventYield, 1f))
                     units = GameMath.CeilToInt(units * eventYield);
-                int snapUnusedSpace = store != null ? store.WarehouseSpace : 0;
-                int snapWarehouseCapacity = store != null ? store.WarehouseCapacity : 0;
-                int snapSolidStock = store != null ? store.Solid : 0;
+                int snapUnusedSpace = turnSnapUnusedSpace;
+                int snapWarehouseCapacity = turnSnapWarehouseCapacity;
+                int snapSolidStock = turnSnapSolidStock;
                 if (advanceMods.GatherUnitsPerProcessedThreshold > 0
-                    && advanceMods.GatherUnitsPerProcessedAmount > 0
-                    && store != null)
+                    && advanceMods.GatherUnitsPerProcessedAmount > 0)
                 {
-                    int processed = Mathf.Max(0, store.Processed);
                     int threshold = advanceMods.GatherUnitsPerProcessedThreshold;
-                    units += (processed / threshold) * advanceMods.GatherUnitsPerProcessedAmount;
+                    units += (turnSnapProcessed / threshold) * advanceMods.GatherUnitsPerProcessedAmount;
                 }
 
                 if (units <= 0) continue;
@@ -486,12 +583,12 @@ namespace Soup.Game
 
                 var bucket = GetOrCreateOutput(gatherOutputs, job, GetGatherJobNumber(job));
 
-                if (job.OutputIngredient != null)
+                if (definition.OutputIngredient != null)
                 {
                     int softBonus = advanceMods.SoftPerUnitBonus;
                     int maxWorkers = JobProgressionManager.Instance != null
                         ? JobProgressionManager.Instance.GetEffectiveMaxWorkers(job)
-                        : job.GetEffectiveMaxWorkers(advancePath);
+                        : definition.GetEffectiveMaxWorkers(advancePath);
                     if (advanceMods.SoftPerUnitWhenFull > 0 && maxWorkers > 0 && workers >= maxWorkers)
                         softBonus += advanceMods.SoftPerUnitWhenFull;
 
@@ -528,7 +625,7 @@ namespace Soup.Game
 
                         ApplyGatherIngredientBatch(
                             store, result, relicCtx, bucket,
-                            job.OutputIngredient, baseUnits,
+                            definition.OutputIngredient, baseUnits,
                             softBonus, advanceMods.SolidPerUnitBonus, advanceMods.ToughPerUnitBonus,
                             coldBonus, spicyBonus, sourBonus, magicBonus, randomFlavorBonus, efficiency,
                             advanceMods);
@@ -539,11 +636,22 @@ namespace Soup.Game
                             coldBonus, spicyBonus, sourBonus, magicBonus, randomFlavorBonus, efficiency,
                             advanceMods);
                     }
+                    else if (advanceMods.IsReplacementGatherOutput)
+                    {
+                        int relicBonus = RelicEffectRunner.SumGatherAmountPerWorkerBonus();
+                        int outputUnits = advanceMods.ResolveReplacementOutputUnits(
+                            workers, units, relicBonus);
+                        ApplyGatherIngredientBatch(
+                            store, result, relicCtx, bucket,
+                            advanceMods.BonusIngredient, outputUnits,
+                            0, 0, 0, 0, 0, 0, 0, 0, efficiency,
+                            advanceMods);
+                    }
                     else
                     {
                         ApplyGatherIngredientBatch(
                             store, result, relicCtx, bucket,
-                            job.OutputIngredient, units,
+                            definition.OutputIngredient, units,
                             softBonus, advanceMods.SolidPerUnitBonus, advanceMods.ToughPerUnitBonus,
                             coldBonus, spicyBonus, sourBonus, magicBonus, randomFlavorBonus, efficiency,
                             advanceMods);
@@ -721,7 +829,7 @@ namespace Soup.Game
         }
 
         /// <summary>
-        /// 棍棍虫等：按采集前仓库空位 / 容量 / 坚固存量换算额外坚固。
+        /// 棍棍虫等：按回合开始仓库快照（空位 / 容量 / 坚固存量）换算额外坚固。
         /// </summary>
         private static void ApplyWarehouseScaledSolidBonuses(
             ResourceStore store,
@@ -734,30 +842,17 @@ namespace Soup.Game
         {
             if (store == null) return;
 
-            int solid = 0;
-            if (mods.SolidPerUnusedWarehouseThreshold > 0 && mods.SolidPerUnusedWarehouseAmount > 0)
-            {
-                if (unusedSpace > 0 && unusedSpace < int.MaxValue)
-                    solid += (unusedSpace / mods.SolidPerUnusedWarehouseThreshold)
-                             * mods.SolidPerUnusedWarehouseAmount;
-            }
-
-            if (mods.SolidPerWarehouseCapacityThreshold > 0 && mods.SolidPerWarehouseCapacityAmount > 0)
-            {
-                if (warehouseCapacity > 0)
-                    solid += (warehouseCapacity / mods.SolidPerWarehouseCapacityThreshold)
-                             * mods.SolidPerWarehouseCapacityAmount;
-            }
-
-            if (mods.SolidPerWarehouseSolidThreshold > 0 && mods.SolidPerWarehouseSolidAmount > 0)
-            {
-                int stock = Mathf.Max(0, solidStock);
-                solid += (stock / mods.SolidPerWarehouseSolidThreshold)
-                         * mods.SolidPerWarehouseSolidAmount;
-            }
-
+            int solid = mods.ComputeWarehouseScaledSolidBonus(
+                unusedSpace, warehouseCapacity, solidStock);
             if (solid <= 0) return;
             ApplyIngredientYield(store, result, new IngredientYield { Solid = solid }, bucket);
+        }
+
+        private static int SnapWarehouseSpace(ResourceStore store)
+        {
+            if (store == null) return 0;
+            int space = store.WarehouseSpace;
+            return space == int.MaxValue ? 0 : space;
         }
 
         private static void ApplyBonusIngredient(
@@ -766,13 +861,14 @@ namespace Soup.Game
             RelicContext relicCtx,
             GatherTurnOutput bucket,
             JobAdvanceGatherMods mods,
-            float _)
+            float efficiency)
         {
             if (!mods.HasBonusIngredient) return;
+            if (mods.IsReplacementGatherOutput) return;
             ApplyGatherIngredientBatch(
                 store, result, relicCtx, bucket,
                 mods.BonusIngredient, mods.BonusIngredientAmount,
-                0, 0, 0, 0, 0, 0, 0, 0, 1f);
+                0, 0, 0, 0, 0, 0, 0, 0, efficiency, mods);
         }
 
         /// <summary>
@@ -871,7 +967,7 @@ namespace Soup.Game
 
             ApplyEventYieldTweaks(bucket != null ? bucket.Job : null, units, ref yield);
 
-            if (forceMods.SuppressRawMaterialOutput)
+            if (forceMods.ShouldSuppressYieldFor(ingredient))
             {
                 yield.Soft = 0;
                 yield.Tough = 0;
@@ -1519,9 +1615,10 @@ namespace Soup.Game
                 int consumed = store.ConsumeProcessedUpTo(demand);
                 if (consumed <= 0) continue;
 
-                store.AddCooked(consumed);
-                int scoreGain = GameMath.CeilMul(consumed, scoreMultiplier);
-                result.CookedGained += consumed;
+                int cooked = RelicEffectRunner.ApplyCookOutputWaste(consumed);
+                store.AddCooked(cooked);
+                int scoreGain = GameMath.CeilMul(cooked, scoreMultiplier);
+                result.CookedGained += cooked;
                 result.ProcessedConsumed += consumed;
                 cookScoreBase += scoreGain;
             }
@@ -1596,9 +1693,14 @@ namespace Soup.Game
 
         public override string ToString()
         {
-            return
-                $"大关 {StageIndex} 结算: 本关烹饪 {CookedInStage}, " +
-                $"酸涩 {SourUsed}→+{SourScore} 分, 总分 {TotalScoreAfter}";
+            if (SourScore > 0)
+            {
+                return
+                    $"大关 {StageIndex} 结算: 酸涩 {SourUsed}→+{SourScore} 分，" +
+                    $"本关烹饪 {CookedInStage}，总分 {TotalScoreAfter}";
+            }
+
+            return $"大关 {StageIndex} 结算: 本关烹饪 {CookedInStage}, 总分 {TotalScoreAfter}";
         }
     }
 

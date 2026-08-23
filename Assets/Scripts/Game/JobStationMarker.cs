@@ -16,14 +16,17 @@ namespace Soup.Game
         [SerializeField] private SpriteRenderer body;
         [SerializeField] private TextMesh nameMesh;
         [SerializeField] private TextMesh countMesh;
+        [SerializeField] private TextMesh efficiencyMesh;
 
         private JobItem _job;
         private Color _litColor = Color.white;
         private bool _unlocked;
         private GameObject _plusGo;
         private GameObject _minusGo;
+        private Transform _clearButton;
         private Collider2D _plusHit;
         private Collider2D _minusHit;
+        private Collider2D _clearHit;
         private SpriteRenderer _plusSr;
         private SpriteRenderer _minusSr;
         private SpriteRenderer _iconSr;
@@ -64,6 +67,7 @@ namespace Soup.Game
 
             SetPadActive(_plusGo, _plusHit, _plusSr, unlocked);
             SetPadActive(_minusGo, _minusHit, _minusSr, unlocked);
+            StationAssignClearPad.SetActive(_clearButton, unlocked);
             RefreshLabel();
         }
 
@@ -74,6 +78,7 @@ namespace Soup.Game
             bool show = visible && _unlocked;
             SetPadActive(_plusGo, _plusHit, _plusSr, show);
             SetPadActive(_minusGo, _minusHit, _minusSr, show);
+            StationAssignClearPad.SetActive(_clearButton, show);
         }
 
         public void RefreshLabel()
@@ -118,15 +123,62 @@ namespace Soup.Game
                     countMesh.text = $"{assigned}/{cap}";
                 }
             }
+
+            RefreshEfficiencyLabel();
+        }
+
+        private void RefreshEfficiencyLabel()
+        {
+            if (efficiencyMesh == null) return;
+
+            if (!_unlocked || _job == null)
+            {
+                efficiencyMesh.text = string.Empty;
+                efficiencyMesh.gameObject.SetActive(false);
+                return;
+            }
+
+            float mult = WorkEfficiencyResolver.ResolveStationDisplayMultiplier(_job);
+            bool show = mult > 0f && Mathf.Abs(mult - 1f) > 0.01f;
+            efficiencyMesh.gameObject.SetActive(show);
+            if (!show)
+            {
+                efficiencyMesh.text = string.Empty;
+                return;
+            }
+
+            efficiencyMesh.text = $"×{mult:0.##}";
         }
 
         public void HandleHit(Collider2D hit)
         {
             if (!_unlocked || hit == null) return;
+            if (StationAssignClearPad.IsHit(hit, _clearButton, _clearHit))
+            {
+                TryClearAll();
+                return;
+            }
+
             if (hit == _plusHit || hit.name == "Plus")
                 TryChange(+1);
             else if (hit == _minusHit || hit.name == "Minus")
                 TryChange(-1);
+        }
+
+        private void TryClearAll()
+        {
+            if (!_unlocked) return;
+            var em = EmployeeManager.Instance;
+            if (em == null || _job == null) return;
+            if (!em.TryClearJobAssignments(_job)) return;
+
+            RefreshLabel();
+            var zone = FindObjectOfType<GatherZoneView>();
+            zone?.Refresh();
+            var process = FindObjectOfType<ProcessZoneView>();
+            process?.Refresh();
+            var cook = FindObjectOfType<CookZoneView>();
+            cook?.Refresh();
         }
 
         private void TryChange(int delta)
@@ -170,6 +222,15 @@ namespace Soup.Game
                 nameMesh = CreateTextChild("Name", new Vector3(0f, 0.95f, 0f), 28, TextAnchor.LowerCenter);
             if (countMesh == null)
                 countMesh = CreateTextChild("Count", new Vector3(0f, -0.95f, 0f), 32, TextAnchor.UpperCenter);
+            if (efficiencyMesh == null)
+            {
+                efficiencyMesh = CreateTextChild(
+                    "Efficiency",
+                    new Vector3(1.05f, 0.12f, 0f),
+                    22,
+                    TextAnchor.MiddleLeft);
+                efficiencyMesh.color = new Color(0.92f, 0.96f, 1f, 0.95f);
+            }
 
             if (_minusGo == null)
             {
@@ -181,6 +242,12 @@ namespace Soup.Game
             {
                 _plusHit = CreatePad("Plus", new Vector3(0.85f, 0f, 0f), new Color(0.30f, 0.70f, 0.40f), "+",
                     out _plusGo, out _plusSr);
+            }
+
+            if (_clearButton == null)
+            {
+                _clearHit = StationAssignClearPad.Ensure(ref _clearButton, transform, 5);
+                StationAssignClearPad.LayoutLocalBelow(_clearButton, -1.35f);
             }
         }
 
@@ -194,7 +261,7 @@ namespace Soup.Game
                 EnsureIconRenderer();
                 _iconSr.sprite = _job.Icon;
                 _iconSr.enabled = true;
-                FitSpriteRenderer(_iconSr, IconLocalSize);
+                FitSpriteRenderer(_iconSr, IconLocalSize * JobIconLayout.ResolveStationIconScaleMultiplier(_job));
                 if (body != null)
                     body.enabled = false;
             }

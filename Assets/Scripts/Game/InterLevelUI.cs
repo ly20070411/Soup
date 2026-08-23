@@ -12,7 +12,12 @@ namespace Soup.Game
     /// </summary>
     public sealed class InterLevelUI : MonoBehaviour
     {
+        public const string CanvasName = "InterLevelCanvas";
+        public const string FreeDrawName = "FreeDraw";
+        public const string SystemHudName = "SystemHud";
+
         private GameObject _root;
+        private Transform _authoredRoot;
         private GameObject _mainRoot;
         private GameObject _failRoot;
         private GameObject _victoryRoot;
@@ -20,8 +25,11 @@ namespace Soup.Game
         private Text _hintText;
         private Text _failTitleText;
         private Text _failBodyText;
+        private Text _failScoreText;
         private Text _victoryTitleText;
         private Text _victoryBodyText;
+        private Text _victoryScoreText;
+        private Text _levelScoreText;
         private Text _toastText;
         private string _toast = string.Empty;
         private float _toastUntil;
@@ -47,9 +55,23 @@ namespace Soup.Game
 
         private bool _leaving;
 
+        /// <summary>Screen-space anchor Y for the level score readout (upper quarter, centered).</summary>
+        private const float LevelScoreAnchorY = 0.75f;
+
+        public Transform FreeDrawRoot
+        {
+            get
+            {
+                if (_root != null)
+                    return FindNamed(_root.transform, FreeDrawName);
+                var canvas = transform.Find(CanvasName);
+                return canvas != null ? FindNamed(canvas, FreeDrawName) : null;
+            }
+        }
+
         private void Awake()
         {
-            Build();
+            EnsureAuthoredCanvas(rebuildSystemUi: true);
         }
 
         private void OnEnable()
@@ -132,14 +154,23 @@ namespace Soup.Game
             bool showVictory = levels != null && levels.IsCampaignComplete && !showRewards;
             bool showFail = levels != null && levels.IsLost && !showRewards && !showVictory;
 
-            if (_mainRoot != null) _mainRoot.SetActive(showRewards);
+            // Authored hub art stays visible; programmatic MainHub toggles with reward state.
+            if (_authoredRoot != null)
+                _authoredRoot.gameObject.SetActive(true);
+            if (_mainRoot != null)
+                _mainRoot.SetActive(showRewards && _authoredRoot == null);
             if (_failRoot != null) _failRoot.SetActive(showFail);
             if (_victoryRoot != null) _victoryRoot.SetActive(showVictory);
+
+            // Dim interactive authored buttons when not in reward hub.
+            SetAuthoredInteractable(showRewards && !_leaving);
 
             if (showFail)
                 RefreshFail(levels);
             if (showVictory)
                 RefreshVictory(levels);
+
+            RefreshLevelScoreCaption(levels, showRewards);
 
             if (!showRewards) return;
 
@@ -149,25 +180,59 @@ namespace Soup.Game
             if (_hintText != null)
                 _hintText.text = $"{levelName} 通关 · 领取奖励后可进入下一关";
 
-            SetClaimButton(_elfButton, _elfButtonLabel,
-                $"获得小精灵 ×{LevelClearRewardSession.ResolveElfRewardCount()}",
-                session.ElvesClaimed);
-
-            SetClaimButton(_warehouseButton, _warehouseButtonLabel,
-                $"仓库上限 +{LevelClearRewardSession.WarehouseBonusAmount}",
-                session.WarehouseClaimed);
+            SetClaimButton(_elfButton, _elfButtonLabel, "小精灵增加", session.ElvesClaimed);
+            SetClaimButton(_warehouseButton, _warehouseButtonLabel, "仓库扩容", session.WarehouseClaimed);
+            RefreshClaimHoverTooltips(session);
 
             RefreshAdvanceButton(_advanceGatherButton, MapZoneType.Gather, session);
             RefreshAdvanceButton(_advanceProcessButton, MapZoneType.Process, session);
             RefreshAdvanceButton(_advanceCookButton, MapZoneType.Cook, session);
             RefreshEventButtons(session);
-            RefreshShopButton();
+            RefreshShopButton(session);
 
             bool canProceed = session.HubRewardsClaimed;
             if (_proceedButton != null)
                 _proceedButton.interactable = canProceed && !_leaving;
             if (_proceedButtonLabel != null)
                 _proceedButtonLabel.text = canProceed ? "进入下一关" : "请先领取精灵与仓库";
+        }
+
+        private void RefreshClaimHoverTooltips(LevelClearRewardSession session)
+        {
+            BindClaimHover(
+                _elfButton,
+                "小精灵增加",
+                () =>
+                {
+                    int n = LevelClearRewardSession.ResolveElfRewardCount();
+                    if (session != null && session.ElvesClaimed)
+                        return $"本关已领取。\n通关奖励为小精灵 ×{n}。";
+                    return $"点击领取通关奖励：获得小精灵 ×{n}。";
+                });
+
+            BindClaimHover(
+                _warehouseButton,
+                "仓库扩容",
+                () =>
+                {
+                    int bonus = LevelClearRewardSession.WarehouseBonusAmount;
+                    var store = ResourceStore.Instance;
+                    string cap = store != null
+                        ? (store.WarehouseCapacity <= 0 ? "不限" : store.WarehouseCapacity.ToString())
+                        : "—";
+                    if (session != null && session.WarehouseClaimed)
+                        return $"本关已领取。\n仓库上限 +{bonus}（当前 {cap}）。";
+                    return $"点击领取通关奖励：仓库上限 +{bonus}。\n当前仓库上限：{cap}";
+                });
+        }
+
+        private static void BindClaimHover(Button button, string title, System.Func<string> body)
+        {
+            if (button == null) return;
+            var tip = button.GetComponent<UiHoverTooltip>();
+            if (tip == null)
+                tip = button.gameObject.AddComponent<UiHoverTooltip>();
+            tip.Bind(() => title, body);
         }
 
         private void RefreshVictory(LevelManager levels)
@@ -180,6 +245,10 @@ namespace Soup.Game
 
             if (_victoryTitleText != null)
                 _victoryTitleText.text = "游戏胜利！";
+            if (_victoryScoreText != null)
+                _victoryScoreText.text = levels != null
+                    ? levels.LastFinishedScore.ToString()
+                    : "0";
             if (_victoryBodyText != null)
                 _victoryBodyText.text = $"已完成全部 {total} 关\n恭喜通关！";
         }
@@ -195,14 +264,48 @@ namespace Soup.Game
             SetEventButton(_eventButton1, _eventButton1Label, 1, canOpen, claimed, busy);
         }
 
-        private void RefreshShopButton()
+        private void RefreshShopButton(LevelClearRewardSession session)
         {
-            var shop = FindObjectOfType<ShopPanelUI>();
-            bool purchased = shop != null && shop.PurchasedThisVisit;
+            bool purchased = session != null && session.ShopClaimed;
+            bool shopOpen = IsShopLevel(session);
+            bool eventBusy = EventManager.Instance != null &&
+                             (EventManager.Instance.HasPendingEvent || EventManager.Instance.HasStageEventBatch);
+            bool canOpen = !_leaving && shopOpen && !purchased && !eventBusy;
             if (_shopButton != null)
-                _shopButton.interactable = !_leaving && !purchased;
+                _shopButton.interactable = canOpen;
             if (_shopButtonLabel != null)
-                _shopButtonLabel.text = purchased ? "商店（已购买）" : "商店";
+            {
+                if (!shopOpen)
+                {
+                    int interval = ResolveShopIntervalLevels();
+                    _shopButtonLabel.text = interval > 1
+                        ? $"商店（每{interval}关）"
+                        : "商店（本关未开启）";
+                }
+                else
+                    _shopButtonLabel.text = purchased ? "商店（已购买）" : "商店";
+            }
+        }
+
+        private static int ResolveShopIntervalLevels()
+        {
+            var config = ResolveGameConfig();
+            return config != null ? config.ShopIntervalLevels : 2;
+        }
+
+        private static GameConfig ResolveGameConfig()
+        {
+            var config = ResourceStore.Instance != null ? ResourceStore.Instance.Config : null;
+            return config != null
+                ? config
+                : Resources.Load<GameConfig>(ResourceStore.ResourcesConfigPath);
+        }
+
+        private static bool IsShopLevel(LevelClearRewardSession session)
+        {
+            if (session == null || !session.IsActive) return false;
+            var config = ResolveGameConfig();
+            return config != null && config.IsShopLevel(session.LevelsClearedAtStart);
         }
 
         private static void SetEventButton(
@@ -279,12 +382,53 @@ namespace Soup.Game
         private void RefreshFail(LevelManager levels)
         {
             string levelName = levels.Current != null ? levels.Current.DisplayName : "本关";
-            int gained = levels.ScoreGainedInLevel;
+            int gained = levels.LastFinishedScore;
             int target = levels.TargetScore;
             if (_failTitleText != null)
                 _failTitleText.text = $"{levelName} 失败";
+            if (_failScoreText != null)
+                _failScoreText.text = gained.ToString();
             if (_failBodyText != null)
-                _failBodyText.text = $"第 {levels.MaxTurns} 回合已结束（含酸涩结算）\n得分 {gained} / 目标 {target}";
+            {
+                var level = levels.Current;
+                string challenge = level != null && level.HasChallengeScore
+                    ? $"\n挑战 {level.ChallengeScore} 分"
+                    : string.Empty;
+                string ultimate = level != null && level.HasUltimateChallengeScore
+                    ? $"\n终极挑战 {level.UltimateChallengeScore} 分"
+                    : string.Empty;
+                _failBodyText.text = $"第 {levels.MaxTurns} 回合已结束\n目标 {target} 分{challenge}{ultimate}";
+            }
+        }
+
+        private void RefreshLevelScoreCaption(LevelManager levels, bool visible)
+        {
+            if (_levelScoreText == null) return;
+            ApplyLevelScoreCaptionLayout();
+            _levelScoreText.gameObject.SetActive(visible);
+            if (!visible || levels == null)
+                return;
+
+            _levelScoreText.text = FormatLevelSettlementScore(levels);
+        }
+
+        private void ApplyLevelScoreCaptionLayout()
+        {
+            if (_levelScoreText == null) return;
+            var rt = _levelScoreText.rectTransform;
+            rt.anchorMin = new Vector2(0.5f, LevelScoreAnchorY);
+            rt.anchorMax = new Vector2(0.5f, LevelScoreAnchorY);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+        }
+
+        private static string FormatLevelSettlementScore(LevelManager levels)
+        {
+            int score = levels.LastFinishedScore;
+            var level = levels.Current;
+            if (level != null)
+                return level.FormatSettlementCaption(score);
+            return $"本关得分\n<size=64>{score}</size>";
         }
 
         private static void SetClaimButton(Button button, Text label, string readyText, bool claimed)
@@ -316,10 +460,21 @@ namespace Soup.Game
         private void OnShopClicked()
         {
             if (_leaving) return;
+            var session = LevelManager.Instance?.ClearRewards;
+            if (!IsShopLevel(session))
+            {
+                int interval = ResolveShopIntervalLevels();
+                ShowToast(interval > 1
+                    ? $"商店每 {interval} 关开启一次"
+                    : "本关通关后商店未开启");
+                Refresh();
+                return;
+            }
+
             var shop = ShopPanelUI.Ensure(transform);
             shop.SetToastHandler(msg => ShowToast(msg, 3f));
             shop.SetClosedHandler(Refresh);
-            if (shop.PurchasedThisVisit)
+            if (session != null && session.ShopClaimed)
             {
                 ShowToast("本关商店已购买");
                 Refresh();
@@ -420,10 +575,10 @@ namespace Soup.Game
 
         private void OnFailRetryClicked()
         {
-            if (_leaving) return;
-            TurnManager.Instance?.ResetRun();
-            ShowToast("已重新开始本局", 2f);
-            LeaveToPlay(useDissolve: true);
+            if (_leaving || BlockDissolveTransition.IsBusy) return;
+            _leaving = true;
+            // 与主菜单「开始游戏」一致：新局 + 玩法内采集/处理初始岗位选择。
+            GameSessionLaunch.RequestNewGame();
         }
 
         private void OnFailMenuClicked()
@@ -450,13 +605,29 @@ namespace Soup.Game
                 GameSessionLaunch.ReturnToPlayForAdvancement();
         }
 
-        private void Build()
+        /// <summary>
+        /// Create/bind InterLevelCanvas + FreeDraw + SystemHud.
+        /// FreeDraw is never wiped — place authored art there in the Editor.
+        /// </summary>
+        public void EnsureAuthoredCanvas(bool rebuildSystemUi)
         {
-            var existing = transform.Find("InterLevelCanvas");
-            if (existing != null)
-                Destroy(existing.gameObject);
+            var canvasTf = transform.Find(CanvasName);
+            if (canvasTf == null)
+                canvasTf = CreateCanvasRoot();
 
-            var canvasGo = new GameObject("InterLevelCanvas");
+            _root = canvasTf.gameObject;
+            EnsureEventSystem();
+            EnsureStretchLayer(canvasTf, FreeDrawName, asFirst: true);
+            EnsureFreeDrawMarker(FindNamed(canvasTf, FreeDrawName));
+            EnsureStretchLayer(canvasTf, SystemHudName, asFirst: false);
+
+            if (rebuildSystemUi)
+                RebuildSystemHud(canvasTf);
+        }
+
+        private Transform CreateCanvasRoot()
+        {
+            var canvasGo = new GameObject(CanvasName);
             canvasGo.transform.SetParent(transform, false);
             var canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -466,30 +637,239 @@ namespace Soup.Game
             scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.matchWidthOrHeight = 0.5f;
             canvasGo.AddComponent<GraphicRaycaster>();
+            return canvasGo.transform;
+        }
 
-            if (FindObjectOfType<UnityEngine.EventSystems.EventSystem>() == null)
+        private static void EnsureEventSystem()
+        {
+            if (FindObjectOfType<UnityEngine.EventSystems.EventSystem>() != null)
+                return;
+
+            var es = new GameObject("EventSystem");
+            es.AddComponent<UnityEngine.EventSystems.EventSystem>();
+            es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+        }
+
+        private static Transform EnsureStretchLayer(Transform canvas, string name, bool asFirst)
+        {
+            var existing = canvas.Find(name);
+            if (existing != null)
+                return existing;
+
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(canvas, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            if (asFirst)
+                rect.SetAsFirstSibling();
+            else
+                rect.SetAsLastSibling();
+            return rect;
+        }
+
+        private static InterLevelFreeDrawLayer EnsureFreeDrawMarker(Transform freeDraw)
+        {
+            if (freeDraw == null)
+                return null;
+            var marker = freeDraw.GetComponent<InterLevelFreeDrawLayer>();
+            return marker != null ? marker : freeDraw.gameObject.AddComponent<InterLevelFreeDrawLayer>();
+        }
+
+        private static Transform FindNamed(Transform root, string name)
+        {
+            if (root == null || string.IsNullOrEmpty(name))
+                return null;
+            if (root.name == name)
+                return root;
+            for (int i = 0; i < root.childCount; i++)
             {
-                var es = new GameObject("EventSystem");
-                es.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+                var found = FindNamed(root.GetChild(i), name);
+                if (found != null)
+                    return found;
             }
 
-            _root = canvasGo;
+            return null;
+        }
 
-            var bg = new GameObject("Background");
-            bg.transform.SetParent(canvasGo.transform, false);
-            var bgRect = bg.AddComponent<RectTransform>();
-            bgRect.anchorMin = Vector2.zero;
-            bgRect.anchorMax = Vector2.one;
-            bgRect.offsetMin = Vector2.zero;
-            bgRect.offsetMax = Vector2.zero;
-            var bgImage = bg.AddComponent<Image>();
-            bgImage.sprite = GameOverlayUI.SharedUiSprite();
-            bgImage.color = new Color(0.08f, 0.10f, 0.14f, 1f);
-            bgImage.raycastTarget = true;
+        private void RebuildSystemHud(Transform canvasTf)
+        {
+            var systemHud = canvasTf.Find(SystemHudName);
+            if (systemHud == null)
+                systemHud = EnsureStretchLayer(canvasTf, SystemHudName, asFirst: false);
+
+            // Wipe only SystemHud — keep FreeDraw authored art intact.
+            for (int i = systemHud.childCount - 1; i >= 0; i--)
+                DestroyImmediateSafe(systemHud.GetChild(i).gameObject);
+
+            _authoredRoot = null;
+            _mainRoot = null;
+            ClearButtonRefs();
+
+            var freeDraw = canvasTf.Find(FreeDrawName);
+            if (freeDraw != null)
+            {
+                var authored = freeDraw.Find("AuthoredHub");
+                if (authored != null && TryBindAuthoredHub(authored))
+                    _authoredRoot = authored;
+            }
+
+            if (_authoredRoot == null)
+                BuildProgrammaticMainHub(systemHud, freeDraw);
+
+            BuildFailVictoryToast(systemHud);
+        }
+
+        private void ClearButtonRefs()
+        {
+            _elfButton = null;
+            _elfButtonLabel = null;
+            _warehouseButton = null;
+            _warehouseButtonLabel = null;
+            _shopButton = null;
+            _shopButtonLabel = null;
+            _eventButton0 = null;
+            _eventButton0Label = null;
+            _eventButton1 = null;
+            _eventButton1Label = null;
+            _advanceGatherButton = null;
+            _advanceProcessButton = null;
+            _advanceCookButton = null;
+            _proceedButton = null;
+            _proceedButtonLabel = null;
+            _titleText = null;
+            _hintText = null;
+            _levelScoreText = null;
+        }
+
+        private bool TryBindAuthoredHub(Transform authored)
+        {
+            if (authored == null) return false;
+
+            _elfButton = BindAuthoredButton(authored, "ElfBtn", OnElfClicked, out _elfButtonLabel);
+            _warehouseButton = BindAuthoredButton(authored, "WarehouseBtn", OnWarehouseClicked, out _warehouseButtonLabel);
+            _shopButton = BindAuthoredButton(authored, "ShopBtn", OnShopClicked, out _shopButtonLabel);
+            _eventButton0 = BindAuthoredButton(authored, "EventBtn0", () => OnEventClicked(0), out _eventButton0Label);
+            _eventButton1 = BindAuthoredButton(authored, "EventBtn1", () => OnEventClicked(1), out _eventButton1Label);
+            _advanceGatherButton = BindAuthoredButton(authored, "AdvanceGatherBtn",
+                () => OnAdvanceClicked(MapZoneType.Gather), out _);
+            _advanceProcessButton = BindAuthoredButton(authored, "AdvanceProcessBtn",
+                () => OnAdvanceClicked(MapZoneType.Process), out _);
+            _advanceCookButton = BindAuthoredButton(authored, "AdvanceCookBtn",
+                () => OnAdvanceClicked(MapZoneType.Cook), out _);
+            _proceedButton = BindAuthoredButton(authored, "ProceedBtn", OnProceedClicked, out _proceedButtonLabel);
+
+            // Caption sits inside button art.
+            PlaceLabelInside(_elfButtonLabel);
+            PlaceLabelInside(_warehouseButtonLabel);
+            PlaceLabelInside(_shopButtonLabel);
+            PlaceLabelInside(_eventButton0Label);
+            PlaceLabelInside(_eventButton1Label);
+            PlaceLabelInside(_advanceGatherButton != null
+                ? _advanceGatherButton.transform.Find("Label")?.GetComponent<Text>() : null);
+            PlaceLabelInside(_advanceProcessButton != null
+                ? _advanceProcessButton.transform.Find("Label")?.GetComponent<Text>() : null);
+            PlaceLabelInside(_advanceCookButton != null
+                ? _advanceCookButton.transform.Find("Label")?.GetComponent<Text>() : null);
+            PlaceLabelInside(_proceedButtonLabel);
+
+            return _elfButton != null
+                   && _warehouseButton != null
+                   && _shopButton != null
+                   && _eventButton0 != null
+                   && _eventButton1 != null
+                   && _advanceGatherButton != null
+                   && _advanceProcessButton != null
+                   && _advanceCookButton != null
+                   && _proceedButton != null;
+        }
+
+        private static void PlaceLabelInside(Text label)
+        {
+            if (label == null) return;
+            var rt = label.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(6f, 4f);
+            rt.offsetMax = new Vector2(-6f, -4f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = Vector2.zero;
+            label.alignment = TextAnchor.MiddleCenter;
+        }
+
+        private static Button BindAuthoredButton(
+            Transform root,
+            string name,
+            UnityEngine.Events.UnityAction onClick,
+            out Text label)
+        {
+            label = null;
+            var tf = root.Find(name);
+            if (tf == null) return null;
+
+            var button = tf.GetComponent<Button>();
+            if (button == null)
+                button = tf.gameObject.AddComponent<Button>();
+            var image = tf.GetComponent<Image>();
+            if (image != null)
+            {
+                image.raycastTarget = true;
+                button.targetGraphic = image;
+            }
+
+            button.onClick.RemoveAllListeners();
+            if (onClick != null)
+                button.onClick.AddListener(onClick);
+
+            label = tf.Find("Label")?.GetComponent<Text>();
+            return button;
+        }
+
+        private void SetAuthoredInteractable(bool enabled)
+        {
+            if (_authoredRoot == null) return;
+            SetButtonGate(_elfButton, enabled);
+            SetButtonGate(_warehouseButton, enabled);
+            SetButtonGate(_shopButton, enabled);
+            SetButtonGate(_eventButton0, enabled);
+            SetButtonGate(_eventButton1, enabled);
+            SetButtonGate(_advanceGatherButton, enabled);
+            SetButtonGate(_advanceProcessButton, enabled);
+            SetButtonGate(_advanceCookButton, enabled);
+            SetButtonGate(_proceedButton, enabled);
+        }
+
+        private static void SetButtonGate(Button button, bool enabled)
+        {
+            if (button == null) return;
+            // Don't force interactable true — Refresh() sets the real claim/advance rules.
+            if (!enabled)
+                button.interactable = false;
+        }
+
+        private void BuildProgrammaticMainHub(Transform systemHud, Transform freeDraw)
+        {
+            // Soft paper behind buttons only if FreeDraw is still empty.
+            if (freeDraw != null && freeDraw.childCount == 0)
+            {
+                var bg = new GameObject("Background");
+                bg.transform.SetParent(freeDraw, false);
+                var bgRect = bg.AddComponent<RectTransform>();
+                bgRect.anchorMin = Vector2.zero;
+                bgRect.anchorMax = Vector2.one;
+                bgRect.offsetMin = Vector2.zero;
+                bgRect.offsetMax = Vector2.zero;
+                var bgImage = bg.AddComponent<Image>();
+                bgImage.sprite = GameOverlayUI.SharedUiSprite();
+                bgImage.color = new Color(0.08f, 0.10f, 0.14f, 1f);
+                bgImage.raycastTarget = true;
+            }
 
             _mainRoot = new GameObject("MainHub");
-            _mainRoot.transform.SetParent(canvasGo.transform, false);
+            _mainRoot.transform.SetParent(systemHud, false);
             var mainRect = _mainRoot.AddComponent<RectTransform>();
             mainRect.anchorMin = Vector2.zero;
             mainRect.anchorMax = Vector2.one;
@@ -509,14 +889,14 @@ namespace Soup.Game
             _hintText.color = new Color(0.78f, 0.82f, 0.9f, 1f);
 
             _elfButton = CreateAnchoredButton(_mainRoot.transform, "ElfBtn",
-                $"获得小精灵 ×{LevelClearRewardSession.ResolveElfRewardCount()}",
+                "小精灵增加",
                 new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
                 new Vector2(48f, -140f), new Vector2(280f, 72f),
                 OnElfClicked);
             _elfButtonLabel = _elfButton.transform.Find("Label")?.GetComponent<Text>();
 
             _warehouseButton = CreateAnchoredButton(_mainRoot.transform, "WarehouseBtn",
-                $"仓库上限 +{LevelClearRewardSession.WarehouseBonusAmount}",
+                "仓库扩容",
                 new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
                 new Vector2(-48f, -140f), new Vector2(280f, 72f),
                 OnWarehouseClicked);
@@ -561,15 +941,31 @@ namespace Soup.Game
                 OnProceedClicked);
             _proceedButtonLabel = _proceedButton.transform.Find("Label")?.GetComponent<Text>();
 
-            _failRoot = BuildBox(canvasGo.transform, "FailBox", new Vector2(640f, 360f));
+            _mainRoot.SetActive(true);
+        }
+
+        private void BuildFailVictoryToast(Transform systemHud)
+        {
+            _failRoot = BuildBox(systemHud, "FailBox", new Vector2(640f, 360f));
             _failTitleText = CreateLabel(_failRoot.transform, "FailTitle",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0f, -36f), new Vector2(560f, 48f),
                 34, FontStyle.Bold, TextAnchor.MiddleCenter);
             _failTitleText.text = "本关失败";
+            var failScoreLabel = CreateLabel(_failRoot.transform, "FailScoreLabel",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 72f), new Vector2(560f, 28f),
+                20, FontStyle.Normal, TextAnchor.MiddleCenter);
+            failScoreLabel.color = new Color(0.88f, 0.90f, 0.94f, 1f);
+            failScoreLabel.text = "本关得分";
+            _failScoreText = CreateLabel(_failRoot.transform, "FailScore",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 20f), new Vector2(560f, 96f),
+                56, FontStyle.Bold, TextAnchor.MiddleCenter);
+            _failScoreText.color = new Color(1f, 0.92f, 0.45f, 1f);
             _failBodyText = CreateLabel(_failRoot.transform, "FailBody",
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -110f), new Vector2(560f, 80f),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0f, -56f), new Vector2(560f, 48f),
                 22, FontStyle.Normal, TextAnchor.MiddleCenter);
             _failBodyText.color = new Color(0.85f, 0.82f, 0.75f, 1f);
             _failRetryButton = CreateAnchoredButton(_failRoot.transform, "FailRetryBtn", "重新开始",
@@ -581,16 +977,27 @@ namespace Soup.Game
                 new Vector2(130f, 48f), new Vector2(220f, 56f),
                 OnFailMenuClicked);
 
-            _victoryRoot = BuildBox(canvasGo.transform, "VictoryBox", new Vector2(640f, 360f));
+            _victoryRoot = BuildBox(systemHud, "VictoryBox", new Vector2(640f, 360f));
             _victoryTitleText = CreateLabel(_victoryRoot.transform, "VictoryTitle",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0f, -36f), new Vector2(560f, 48f),
                 36, FontStyle.Bold, TextAnchor.MiddleCenter);
             _victoryTitleText.text = "游戏胜利！";
             _victoryTitleText.color = new Color(1f, 0.92f, 0.45f, 1f);
+            var victoryScoreLabel = CreateLabel(_victoryRoot.transform, "VictoryScoreLabel",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 72f), new Vector2(560f, 28f),
+                20, FontStyle.Normal, TextAnchor.MiddleCenter);
+            victoryScoreLabel.color = new Color(0.88f, 0.90f, 0.94f, 1f);
+            victoryScoreLabel.text = "本关得分";
+            _victoryScoreText = CreateLabel(_victoryRoot.transform, "VictoryScore",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 20f), new Vector2(560f, 96f),
+                56, FontStyle.Bold, TextAnchor.MiddleCenter);
+            _victoryScoreText.color = new Color(1f, 0.92f, 0.45f, 1f);
             _victoryBodyText = CreateLabel(_victoryRoot.transform, "VictoryBody",
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -120f), new Vector2(560f, 100f),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0f, -56f), new Vector2(560f, 72f),
                 22, FontStyle.Normal, TextAnchor.MiddleCenter);
             _victoryBodyText.color = new Color(0.88f, 0.90f, 0.94f, 1f);
             _victoryMenuButton = CreateAnchoredButton(_victoryRoot.transform, "VictoryMenuBtn", "返回主菜单",
@@ -598,15 +1005,59 @@ namespace Soup.Game
                 new Vector2(0f, 48f), new Vector2(280f, 56f),
                 OnVictoryMenuClicked);
 
-            _toastText = CreateLabel(canvasGo.transform, "Toast",
+            _toastText = CreateLabel(systemHud, "Toast",
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
                 new Vector2(0f, 100f), new Vector2(800f, 60f),
                 22, FontStyle.Normal, TextAnchor.MiddleCenter);
             _toastText.color = new Color(1f, 0.92f, 0.55f, 1f);
 
+            EnsureLevelScoreCaption(systemHud);
+
             _failRoot.SetActive(false);
             _victoryRoot.SetActive(false);
-            _mainRoot.SetActive(true);
+        }
+
+        private void EnsureLevelScoreCaption(Transform systemHud)
+        {
+            if (systemHud == null) return;
+
+            var existing = FindNamed(systemHud, "LevelScoreCaption");
+            if (existing != null)
+            {
+                _levelScoreText = existing.GetComponent<Text>();
+                ApplyLevelScoreCaptionLayout();
+                return;
+            }
+
+            _levelScoreText = CreateLabel(
+                systemHud,
+                "LevelScoreCaption",
+                new Vector2(0.5f, LevelScoreAnchorY),
+                new Vector2(0.5f, LevelScoreAnchorY),
+                new Vector2(0.5f, 0.5f),
+                Vector2.zero,
+                new Vector2(560f, 160f),
+                48,
+                FontStyle.Bold,
+                TextAnchor.MiddleCenter);
+            _levelScoreText.color = new Color(1f, 0.92f, 0.45f, 1f);
+            _levelScoreText.supportRichText = true;
+            _levelScoreText.lineSpacing = 1.05f;
+            _levelScoreText.raycastTarget = false;
+            var outline = _levelScoreText.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0.05f, 0.04f, 0.02f, 0.92f);
+            outline.effectDistance = new Vector2(2f, -2f);
+            ApplyLevelScoreCaptionLayout();
+            _levelScoreText.gameObject.SetActive(false);
+        }
+
+        private static void DestroyImmediateSafe(GameObject go)
+        {
+            if (go == null) return;
+            if (Application.isPlaying)
+                Object.Destroy(go);
+            else
+                Object.DestroyImmediate(go);
         }
 
         private static GameObject BuildBox(Transform parent, string name, Vector2 size)

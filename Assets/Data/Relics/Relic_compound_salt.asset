@@ -14,9 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: compound_salt
   displayName: "\u590D\u5408\u9999\u76D0"
-  description: "\u6BCF\u6709\u4E00\u79CD\u98CE\u5473\uFF0C\u6700\u7EC8\u500D\u7387\u589E\u52A0
-    0.2\u3002"
-  icon: {fileID: 0}
+  description: "\u6BCF\u6709\u4E00\u79CD\u98CE\u5473\uFF0C\u6700\u7EC8\u500D\u7387\u589E\u52A00.2\u3002"
+  icon: {fileID: 21300000, guid: 6d228b0ee0959e9448ec1b3bd52834be, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 0

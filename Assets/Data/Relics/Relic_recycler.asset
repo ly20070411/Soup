@@ -15,7 +15,7 @@ MonoBehaviour:
   id: recycler
   displayName: "\u56DE\u6536\u5668"
   description: "\u6D6A\u8D39\u98DF\u6750\u53D8\u4E3A\u589E\u52A0\u53CC\u500D\u98DF\u6750\u3002"
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 4bc69ef029fb4fa458c4d6c4846233b5, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 2
   allowMultiple: 0

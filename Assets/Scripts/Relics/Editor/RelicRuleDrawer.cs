@@ -60,7 +60,7 @@ namespace Soup.Relics.Editor
 
             var condType = (RelicConditionType)condition.intValue;
             if (condType == RelicConditionType.NoCategoryGathered)
-                y = DrawProp(position.x, y, w, conditionCategory, "食材分类");
+                y = DrawProp(position.x, y, w, conditionCategory, "采集岗产出分类");
             else if (condType == RelicConditionType.HasFlavorCountAtLeast)
                 y = DrawProp(position.x, y, w, conditionInt, "风味种类下限");
             else if (condType == RelicConditionType.HasFlavorCountAtMost)
@@ -69,6 +69,10 @@ namespace Soup.Relics.Editor
             {
                 y = DrawProp(position.x, y, w, conditionInt, "回合下限");
                 y = DrawProp(position.x, y, w, conditionIntMax, "回合上限");
+            }
+            else if (condType == RelicConditionType.LastNLevelTurns)
+            {
+                y = DrawProp(position.x, y, w, conditionInt, "末尾回合数");
             }
 
             y = DrawProp(position.x, y, w, effect, "效果");
@@ -79,8 +83,12 @@ namespace Soup.Relics.Editor
                 case RelicEffectType.AddFinalMultiplier:
                 case RelicEffectType.AddFinalMultiplierPerPresentFlavor:
                 case RelicEffectType.AddGlobalLaborEfficiency:
+                case RelicEffectType.AddProcessLaborEfficiency:
+                case RelicEffectType.AddCookLaborEfficiency:
+                case RelicEffectType.AddCookOutputWasteFraction:
                 case RelicEffectType.MultiplyIndependentScore:
                 case RelicEffectType.AddSpicyScoreMultiplier:
+                case RelicEffectType.ConvertToughSolidFractionToSoft:
                     y = DrawProp(position.x, y, w, floatValue, "数值");
                     break;
                 case RelicEffectType.AddEmployeeTypeLaborEfficiency:
@@ -95,6 +103,9 @@ namespace Soup.Relics.Editor
                 case RelicEffectType.ModifyWarehouseCapacity:
                 case RelicEffectType.AddProcessed:
                 case RelicEffectType.ModifyElfCount:
+                case RelicEffectType.AddAdvanceChargesAllZones:
+                case RelicEffectType.PresentBonusStageEvents:
+                case RelicEffectType.AddAllJobMaxWorkers:
                     y = DrawProp(position.x, y, w, amount, "数量");
                     break;
                 case RelicEffectType.AddRawMaterial:
@@ -124,6 +135,14 @@ namespace Soup.Relics.Editor
                 case RelicEffectType.GrantEmployeeOnElfLoss:
                     y = DrawProp(position.x, y, w, amount, "每损失授予数量");
                     y = DrawProp(position.x, y, w, employeeTypeId, "员工类型Id");
+                    break;
+                case RelicEffectType.GrantEmployee:
+                    y = DrawProp(position.x, y, w, amount, "数量");
+                    y = DrawProp(position.x, y, w, employeeTypeId, "员工类型Id");
+                    break;
+                case RelicEffectType.ConvertElvesToGhosts:
+                    y = DrawProp(position.x, y, w, intValue, "消耗小精灵");
+                    y = DrawProp(position.x, y, w, amount, "获得幽灵");
                     break;
                 case RelicEffectType.AddGatherAmountPerWorker:
                     y = DrawProp(position.x, y, w, amount, "产出份数加成");
@@ -159,6 +178,8 @@ namespace Soup.Relics.Editor
                     return 1;
                 case RelicConditionType.TurnIndexInRange:
                     return 2;
+                case RelicConditionType.LastNLevelTurns:
+                    return 1;
                 default:
                     return 0;
             }
@@ -173,11 +194,18 @@ namespace Soup.Relics.Editor
                 case RelicEffectType.AddFinalMultiplier:
                 case RelicEffectType.AddFinalMultiplierPerPresentFlavor:
                 case RelicEffectType.AddGlobalLaborEfficiency:
+                case RelicEffectType.AddProcessLaborEfficiency:
+                case RelicEffectType.AddCookLaborEfficiency:
+                case RelicEffectType.AddCookOutputWasteFraction:
                 case RelicEffectType.MultiplyIndependentScore:
                 case RelicEffectType.AddSpicyScoreMultiplier:
+                case RelicEffectType.ConvertToughSolidFractionToSoft:
                 case RelicEffectType.ModifyWarehouseCapacity:
                 case RelicEffectType.AddProcessed:
                 case RelicEffectType.ModifyElfCount:
+                case RelicEffectType.AddAdvanceChargesAllZones:
+                case RelicEffectType.PresentBonusStageEvents:
+                case RelicEffectType.AddAllJobMaxWorkers:
                 case RelicEffectType.GrantLinkedRelic:
                 case RelicEffectType.GrantSoftFromUnusedWarehousePercent:
                 case RelicEffectType.AddGatherAmountPerWorker:
@@ -187,6 +215,8 @@ namespace Soup.Relics.Editor
                 case RelicEffectType.AddRawMaterial:
                 case RelicEffectType.ChanceGrantRandomRaw:
                 case RelicEffectType.GrantEmployeeOnElfLoss:
+                case RelicEffectType.GrantEmployee:
+                case RelicEffectType.ConvertElvesToGhosts:
                     return 2;
                 case RelicEffectType.GrantIngredientPerGather:
                 case RelicEffectType.GrantRawPerRawProduced:

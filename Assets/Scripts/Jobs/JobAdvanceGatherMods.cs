@@ -93,16 +93,73 @@ namespace Soup.Jobs
         public bool HasBonusIngredient =>
             BonusIngredient != null && BonusIngredientAmount > 0;
 
+        /// <summary>进阶改为只产新采集物（如大团球/巨团山），不再产原岗食材。</summary>
+        public bool IsReplacementGatherOutput =>
+            SuppressRawMaterialOutput && HasBonusIngredient;
+
+        /// <summary>
+        /// suppress 仅作用于本岗基础采集物；替代产出食材（大团球/巨团山等）仍应保留其材质。
+        /// </summary>
+        public bool ShouldSuppressYieldFor(IngredientItem ingredient)
+        {
+            if (!SuppressRawMaterialOutput) return false;
+            if (HasBonusIngredient
+                && ingredient != null
+                && BonusIngredient != null
+                && ingredient.Id == BonusIngredient.Id)
+                return false;
+            return true;
+        }
+
         public bool HasSoftOrSolidConvert =>
             ConvertConsumeSoftOrSolidPerUnit > 0 && ConvertGainToughPerUnit > 0;
 
         public bool HasForcedOutputMaterial => ForceOutputMaterial;
+
+        /// <summary>
+        /// 棍棍虫等：按回合开始时的仓库快照换算额外坚固（空仓/总容/囤固）。
+        /// </summary>
+        public int ComputeWarehouseScaledSolidBonus(
+            int unusedWarehouseSpace,
+            int warehouseCapacity,
+            int solidStock)
+        {
+            int solid = 0;
+            if (SolidPerUnusedWarehouseThreshold > 0 && SolidPerUnusedWarehouseAmount > 0)
+            {
+                if (unusedWarehouseSpace > 0 && unusedWarehouseSpace < int.MaxValue)
+                {
+                    solid += (unusedWarehouseSpace / SolidPerUnusedWarehouseThreshold)
+                             * SolidPerUnusedWarehouseAmount;
+                }
+            }
+
+            if (SolidPerWarehouseCapacityThreshold > 0 && SolidPerWarehouseCapacityAmount > 0
+                && warehouseCapacity > 0)
+            {
+                solid += (warehouseCapacity / SolidPerWarehouseCapacityThreshold)
+                         * SolidPerWarehouseCapacityAmount;
+            }
+
+            if (SolidPerWarehouseSolidThreshold > 0 && SolidPerWarehouseSolidAmount > 0)
+            {
+                int stock = Mathf.Max(0, solidStock);
+                solid += (stock / SolidPerWarehouseSolidThreshold)
+                         * SolidPerWarehouseSolidAmount;
+            }
+
+            return solid;
+        }
 
         public static JobAdvanceGatherMods From(JobItem job, JobAdvanceNodeId path)
         {
             var mods = new JobAdvanceGatherMods();
             if (job == null || path == JobAdvanceNodeId.None)
                 return mods;
+
+            var progression = JobProgressionManager.Instance;
+            if (progression != null)
+                job = progression.ResolveGatherDefinition(job);
 
             var chain = new List<JobAdvanceNodeId>(JobAdvancePath.MaxDepth);
             JobAdvancePath.GetChain(path, chain);
@@ -304,6 +361,27 @@ namespace Soup.Jobs
             if (GatherAmountMultiplier > 0f && !Mathf.Approximately(GatherAmountMultiplier, 1f))
                 amount = Mathf.CeilToInt(amount * GatherAmountMultiplier);
             return amount;
+        }
+
+        /// <summary>
+        /// 替代产出模式下的采集份数：每员工 BonusIngredientAmount 份 + 遗物每精灵加成（如丰饶祝福）。
+        /// </summary>
+        public int ResolveReplacementOutputUnits(int workers, int scaledUnits, int relicBonusPerWorker)
+        {
+            if (!IsReplacementGatherOutput)
+                return scaledUnits;
+
+            int extra = relicBonusPerWorker > 0 && workers > 0
+                ? Mathf.CeilToInt(workers * relicBonusPerWorker)
+                : 0;
+
+            if (BonusIngredientAmount > 0 && workers > 0)
+                return BonusIngredientAmount * workers + extra;
+
+            if (BonusIngredientAmount > 0)
+                return BonusIngredientAmount;
+
+            return scaledUnits + extra;
         }
 
         /// <summary>已摧毁岗位每回合额外产出的份数（取各岗进阶路径最大值之和；通常仅小白花 2-2）。</summary>

@@ -35,6 +35,9 @@ namespace Soup.Game
         private GameObject _zoneFrame;
         private EventPanelUI _eventPanelUi;
         private Button _nextTurnButton;
+        private Text _turnCountAboveNext;
+        private const int TurnCountFontSize = 28;
+        private static readonly Color TurnCountColor = Color.black;
         private Button _undoTurnButton;
         private Button _settleStageButton;
         private Button _zonePrevButton;
@@ -102,11 +105,6 @@ namespace Soup.Game
             RefreshInfo();
             SyncOverlayWithPanel();
 
-            if (_settingsPanel != null && _settingsPanel.activeSelf && Input.GetKeyDown(KeyCode.Escape)
-                && (_eventPanelUi == null || !_eventPanelUi.IsOpen)
-                && (StarterJobSelectUI.Instance == null || !StarterJobSelectUI.Instance.IsOpen))
-                SetSettingsOpen(false);
-
             if (_toastText != null)
                 _toastText.text = Time.unscaledTime <= _toastUntil ? _toast : string.Empty;
 
@@ -140,6 +138,8 @@ namespace Soup.Game
 
             if (_nextTurnButton != null)
                 _nextTurnButton.interactable = canTurn;
+
+            RefreshTurnCountAboveNext();
 
             if (_settleStageButton != null)
             {
@@ -181,13 +181,19 @@ namespace Soup.Game
             var levels = LevelManager.Instance;
             int gained = levels != null ? levels.ScoreGainedInLevel : 0;
             int target = level != null ? level.TargetScore : 0;
-            ShowToast($"{name} 失败：{gained}/{target} 分 → 结算页", 2f);
+            ShowToast($"{name} 失败：{gained}/{target} 分", 2f);
         }
 
         private void OnLevelStarted(LevelItem level)
         {
             if (level == null) return;
-            ShowToast($"进入 {level.DisplayName}：第 1/{level.MaxTurns} 回合，目标 {level.TargetScore} 分", 3f);
+            string challenge = level.HasChallengeScore ? $"，挑战 {level.ChallengeScore} 分" : string.Empty;
+            string ultimate = level.HasUltimateChallengeScore
+                ? $"，终极挑战 {level.UltimateChallengeScore} 分"
+                : string.Empty;
+            ShowToast(
+                $"进入 {level.DisplayName}：第 1/{level.MaxTurns} 回合，目标 {level.TargetScore} 分{challenge}{ultimate}",
+                3f);
         }
 
         private void OnCampaignCompleted()
@@ -323,7 +329,7 @@ namespace Soup.Game
             };
 
             return
-                $"关卡 {level.DisplayName}  得分 {levels.ScoreGainedInLevel}/{level.TargetScore}  [{status}]\n";
+                $"关卡 {level.DisplayName}  {level.FormatScoreProgress(levels.ScoreGainedInLevel)}  [{status}]\n";
         }
 
         /// <summary>Scene object you can parent Image / Text / buttons under. Never moved or destroyed at runtime.</summary>
@@ -364,6 +370,7 @@ namespace Soup.Game
 
             BindExistingWidgets(canvasTf);
             EnsureSystemWidgets(systemHud);
+            RemoveDeprecatedSystemButtons(canvasTf);
             StripLegacyRuntimePanels(canvasTf);
             EnsureAuthoredHud(FindNamed(canvasTf, FreeDrawName));
 
@@ -519,26 +526,14 @@ namespace Soup.Game
                 _toastText.color = new Color(1f, 0.92f, 0.55f);
             }
 
-            if (FindNamed(systemHud.parent, "SettingsBtn") == null)
-            {
-                CreateButton(systemHud, "SettingsBtn", "设置",
-                    new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f),
-                    new Vector2(140f, 56f));
-            }
-
-            if (FindNamed(systemHud.parent, "ControlPanelBtn") == null)
-            {
-                CreateButton(systemHud, "ControlPanelBtn", "操控面板",
-                    new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-168f, -16f),
-                    new Vector2(180f, 56f));
-            }
-
             if (_nextTurnButton == null)
             {
                 _nextTurnButton = CreateButton(systemHud, "NextTurnBtn", "下一回合",
                     new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-24f, 24f),
                     new Vector2(200f, 64f));
             }
+
+            EnsureTurnCountAboveNext();
 
             if (_undoTurnButton == null)
             {
@@ -563,6 +558,83 @@ namespace Soup.Game
             BindExistingWidgets(systemHud.parent);
         }
 
+        private void EnsureTurnCountAboveNext()
+        {
+            if (_nextTurnButton == null) return;
+
+            if (_turnCountAboveNext == null)
+            {
+                var existing = _nextTurnButton.transform.Find("TurnCountLabel");
+                if (existing != null)
+                    _turnCountAboveNext = existing.GetComponent<Text>();
+            }
+
+            if (_turnCountAboveNext == null)
+            {
+                var go = new GameObject("TurnCountLabel");
+                go.transform.SetParent(_nextTurnButton.transform, false);
+                var rect = go.AddComponent<RectTransform>();
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(1f, 1f);
+                rect.pivot = new Vector2(0.5f, 0f);
+                rect.anchoredPosition = new Vector2(0f, 6f);
+                rect.sizeDelta = new Vector2(0f, 44f);
+
+                _turnCountAboveNext = go.AddComponent<Text>();
+                _turnCountAboveNext.font = GetUiFont();
+                _turnCountAboveNext.fontSize = TurnCountFontSize;
+                _turnCountAboveNext.fontStyle = FontStyle.Normal;
+                _turnCountAboveNext.alignment = TextAnchor.MiddleCenter;
+                _turnCountAboveNext.color = TurnCountColor;
+                _turnCountAboveNext.horizontalOverflow = HorizontalWrapMode.Overflow;
+                _turnCountAboveNext.verticalOverflow = VerticalWrapMode.Overflow;
+                _turnCountAboveNext.raycastTarget = false;
+            }
+            else if (_turnCountAboveNext.transform.parent != _nextTurnButton.transform)
+            {
+                _turnCountAboveNext.transform.SetParent(_nextTurnButton.transform, false);
+            }
+
+            var labelRt = _turnCountAboveNext.rectTransform;
+            labelRt.anchorMin = new Vector2(0f, 1f);
+            labelRt.anchorMax = new Vector2(1f, 1f);
+            labelRt.pivot = new Vector2(0.5f, 0f);
+            labelRt.anchoredPosition = new Vector2(0f, 6f);
+            labelRt.sizeDelta = new Vector2(0f, 44f);
+            _turnCountAboveNext.fontSize = TurnCountFontSize;
+            _turnCountAboveNext.color = TurnCountColor;
+            _turnCountAboveNext.alignment = TextAnchor.MiddleCenter;
+            _turnCountAboveNext.raycastTarget = false;
+        }
+
+        private void RefreshTurnCountAboveNext()
+        {
+            EnsureTurnCountAboveNext();
+            if (_turnCountAboveNext == null) return;
+
+            var levels = LevelManager.Instance;
+            var turns = TurnManager.Instance;
+            if (levels != null && levels.HasLevels)
+                _turnCountAboveNext.text = $"回合 {levels.LevelTurnIndex}/{levels.MaxTurns}";
+            else if (turns != null)
+                _turnCountAboveNext.text = $"回合 {turns.TurnIndex}";
+            else
+                _turnCountAboveNext.text = string.Empty;
+        }
+
+        private static void RemoveDeprecatedSystemButtons(Transform canvas)
+        {
+            HideHudButton(canvas, "SettingsBtn");
+            HideHudButton(canvas, "ControlPanelBtn");
+        }
+
+        private static void HideHudButton(Transform root, string name)
+        {
+            var tf = FindNamed(root, name);
+            if (tf != null)
+                tf.gameObject.SetActive(false);
+        }
+
         private static void StripLegacyRuntimePanels(Transform canvas)
         {
             var legacyEvent = FindNamed(canvas, "EventPanel");
@@ -585,8 +657,6 @@ namespace Soup.Game
 
         private void BindListeners(Transform canvas)
         {
-            BindClick(FindHud<Button>(canvas, "SettingsBtn"), OnSettingsClicked);
-            BindClick(FindHud<Button>(canvas, "ControlPanelBtn"), OnControlPanelClicked);
             BindClick(_nextTurnButton, OnNextTurnClicked);
             BindClick(_undoTurnButton, OnUndoClicked);
             BindClick(_settleStageButton, OnSettleClicked);
@@ -598,16 +668,7 @@ namespace Soup.Game
             BindClick(FindHud<Button>(canvas, "CloseSettingsBtn"), OnCloseSettingsClicked);
         }
 
-        private void OnSettingsClicked() => SetSettingsOpen(true);
-
-        private void OnCloseSettingsClicked() => SetSettingsOpen(false);
-
-        private void OnControlPanelClicked()
-        {
-            SetSettingsOpen(false);
-            if (controlPanelHud != null)
-                controlPanelHud.TogglePanelMode();
-        }
+        private void OnCloseSettingsClicked() => SettingsMenuUI.Instance?.SetOpen(false);
 
         private void OnZonePrevClicked()
         {
@@ -626,34 +687,13 @@ namespace Soup.Game
         private void ApplyZoneCamera()
         {
             if (cameraController == null) return;
-
-            var zone = cameraController.CurrentZone;
-            switch (zone)
-            {
-                case MapZoneType.Gather when gatherZone != null:
-                    cameraController.ConfigureZone(
-                        zone,
-                        gatherZone.RecommendedOrthographicSize(),
-                        gatherZone.RecommendedCameraCenterY());
-                    break;
-                case MapZoneType.Process when processZone != null:
-                    cameraController.ConfigureZone(
-                        zone,
-                        processZone.RecommendedOrthographicSize(),
-                        processZone.RecommendedCameraCenterY());
-                    break;
-                case MapZoneType.Cook when cookZone != null:
-                    float cookSize = cookZone.RecommendedOrthographicSize();
-                    if (cookSize < 0.5f && gatherZone != null)
-                        cookSize = gatherZone.RecommendedOrthographicSize();
-                    cameraController.ConfigureZone(
-                        zone,
-                        cookSize,
-                        cookZone.RecommendedCameraCenterY());
-                    break;
-            }
-
-            cameraController.SetZone(zone);
+            ZoneViewFraming.ApplyZoneCamera(
+                cameraController,
+                cameraController.CurrentZone,
+                gatherZone,
+                processZone,
+                cookZone,
+                snap: false);
         }
 
         private void OnSaveClicked()
@@ -693,7 +733,7 @@ namespace Soup.Game
                 else if (levels.IsLost)
                     ShowToast("本关失败，请重置局重试");
                 else
-                    ShowToast("正在结算本关（酸涩换分）…");
+                    ShowToast("正在判定本关胜负…");
                 return;
             }
 
@@ -705,9 +745,18 @@ namespace Soup.Game
             }
 
             var result = turns.NextTurn();
-            ShowToast(result != null ? result.ToString() : "回合完成");
+            ShowToast(FormatTurnToast(result));
             var map = FindObjectOfType<JobWorldMap>();
             map?.RefreshLabels();
+            cookZone?.Refresh();
+        }
+
+        private static string FormatTurnToast(TurnResult result)
+        {
+            if (result == null)
+                return "回合完成";
+
+            return $"回合 {result.TurnIndex}  +{result.ScoreGained} 分";
         }
 
         private void OnUndoClicked()
@@ -767,6 +816,7 @@ namespace Soup.Game
             ShowToast(settle != null ? settle.ToString() : "大关已结算");
             var map = FindObjectOfType<JobWorldMap>();
             map?.RefreshLabels();
+            cookZone?.Refresh();
         }
 
         private static void BindClick(Button button, UnityEngine.Events.UnityAction action)
@@ -1027,7 +1077,7 @@ namespace Soup.Game
 
             string[] names =
             {
-                "NextTurnBtn", "UndoTurnBtn", "ControlPanelBtn", PlayAuthoredHud.RootName
+                "NextTurnBtn", "UndoTurnBtn", PlayAuthoredHud.RootName
             };
             for (int i = 0; i < names.Length; i++)
             {
@@ -1101,8 +1151,9 @@ namespace Soup.Game
 
         private void SetSettingsOpen(bool open)
         {
-            if (_settingsPanel == null) return;
-            _settingsPanel.SetActive(open);
+            SettingsMenuUI.Instance?.SetOpen(open);
+            if (_settingsPanel != null)
+                _settingsPanel.SetActive(false);
             if (open && controlPanelHud != null && controlPanelHud.IsPanelOpen)
                 controlPanelHud.SetPanelMode(false);
         }

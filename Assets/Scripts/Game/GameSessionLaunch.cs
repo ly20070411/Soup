@@ -22,7 +22,25 @@ namespace Soup.Game
         private static string _pendingGatherStarterJobId;
         private static string _pendingProcessStarterJobId;
         private static bool _pendingCampaignVictory;
+        private static bool _pendingLevelDefeat;
+        private static string _defeatLevelName = string.Empty;
+        private static int _defeatScore;
+        private static int _defeatTargetScore;
         private static bool _hooked;
+
+        public readonly struct PendingLevelDefeatInfo
+        {
+            public readonly string LevelName;
+            public readonly int Score;
+            public readonly int TargetScore;
+
+            public PendingLevelDefeatInfo(string levelName, int score, int targetScore)
+            {
+                LevelName = levelName ?? string.Empty;
+                Score = score;
+                TargetScore = targetScore;
+            }
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
@@ -31,6 +49,10 @@ namespace Soup.Game
             _pendingGatherStarterJobId = null;
             _pendingProcessStarterJobId = null;
             _pendingCampaignVictory = false;
+            _pendingLevelDefeat = false;
+            _defeatLevelName = string.Empty;
+            _defeatScore = 0;
+            _defeatTargetScore = 0;
             _hooked = false;
         }
 
@@ -78,11 +100,39 @@ namespace Soup.Game
             BlockDissolveTransition.Play(() => SceneManager.LoadScene(GameScenes.MainMenu));
         }
 
-        /// <summary>最后一关通关：不进关卡间，回主菜单并宣布胜利。</summary>
-        public static void DeclareCampaignVictory()
+        /// <summary>全战役通关：进入胜利结算场景（美术待定，当前为占位 UI）。</summary>
+        public static void GoToVictorySettlement()
         {
             if (BlockDissolveTransition.IsBusy) return;
 
+            if (!CampaignVictorySession.TryBeginFromLevelManager())
+            {
+                Debug.LogWarning("[GameSessionLaunch] 无法抓取胜利结算数据，回退主菜单弹窗。");
+                FallbackCampaignVictoryToMainMenu();
+                return;
+            }
+
+            if (!CanLoadScene(GameScenes.VictorySettlement))
+            {
+                Debug.LogWarning(
+                    "[GameSessionLaunch] 未找到胜利结算场景，回退主菜单弹窗。请运行 Soup/场景/确保胜利结算场景。");
+                CampaignVictorySession.Clear();
+                FallbackCampaignVictoryToMainMenu();
+                return;
+            }
+
+            AdvancementVisit.Clear();
+            _intent = Intent.None;
+            _pendingGatherStarterJobId = null;
+            _pendingProcessStarterJobId = null;
+            BlockDissolveTransition.Play(() => SceneManager.LoadScene(GameScenes.VictorySettlement));
+        }
+
+        /// <summary>最后一关通关入口（兼容旧调用）。</summary>
+        public static void DeclareCampaignVictory() => GoToVictorySettlement();
+
+        private static void FallbackCampaignVictoryToMainMenu()
+        {
             AdvancementVisit.Clear();
             _pendingCampaignVictory = true;
             _intent = Intent.None;
@@ -91,11 +141,67 @@ namespace Soup.Game
             BlockDissolveTransition.Play(() => SceneManager.LoadScene(GameScenes.MainMenu));
         }
 
+        private static bool CanLoadScene(string sceneName)
+        {
+            if (string.IsNullOrEmpty(sceneName)) return false;
+            if (!Application.CanStreamedLevelBeLoaded(sceneName))
+                return false;
+            return true;
+        }
+
         public static bool ConsumePendingCampaignVictory()
         {
             if (!_pendingCampaignVictory) return false;
             _pendingCampaignVictory = false;
             return true;
+        }
+
+        /// <summary>关卡失败：回主菜单并弹出失败弹窗（不进关卡间）。</summary>
+        public static void DeclareLevelDefeat()
+        {
+            if (BlockDissolveTransition.IsBusy) return;
+
+            CapturePendingLevelDefeatFromManager();
+            AdvancementVisit.Clear();
+            _intent = Intent.None;
+            _pendingGatherStarterJobId = null;
+            _pendingProcessStarterJobId = null;
+            BlockDissolveTransition.Play(() => SceneManager.LoadScene(GameScenes.MainMenu));
+        }
+
+        public static bool ConsumePendingLevelDefeat(out PendingLevelDefeatInfo info)
+        {
+            if (!_pendingLevelDefeat)
+            {
+                info = default;
+                return false;
+            }
+
+            _pendingLevelDefeat = false;
+            info = new PendingLevelDefeatInfo(_defeatLevelName, _defeatScore, _defeatTargetScore);
+            _defeatLevelName = string.Empty;
+            _defeatScore = 0;
+            _defeatTargetScore = 0;
+            return true;
+        }
+
+        private static void CapturePendingLevelDefeatFromManager()
+        {
+            var levels = Soup.Levels.LevelManager.Instance;
+            if (levels != null)
+            {
+                _defeatLevelName = levels.Current != null ? levels.Current.DisplayName : "本关";
+                _defeatScore = levels.LastFinishedScore;
+                _defeatTargetScore = levels.TargetScore;
+            }
+            else
+            {
+                _defeatLevelName = "本关";
+                _defeatScore = 0;
+                _defeatTargetScore = 0;
+            }
+
+            _pendingLevelDefeat = true;
         }
 
         /// <summary>进入关卡间独立场景（通关 hub / 失败页）。</summary>
@@ -179,7 +285,8 @@ namespace Soup.Game
 
         private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            if (scene.name == GameScenes.InterLevel)
+            if (scene.name == GameScenes.InterLevel
+                || scene.name == GameScenes.VictorySettlement)
                 return;
 
             if (scene.name != GameScenes.Play)
@@ -231,7 +338,17 @@ namespace Soup.Game
                 if (_pending == Intent.Continue || _pending == Intent.None)
                 {
                     var levels = Soup.Levels.LevelManager.Instance;
-                    if (levels != null && (levels.HasActiveClearRewards || levels.IsLost))
+                    if (levels != null && levels.IsLost)
+                    {
+                        CapturePendingLevelDefeatFromManager();
+                        AdvancementVisit.Clear();
+                        _intent = Intent.None;
+                        BlockDissolveTransition.Play(() => SceneManager.LoadScene(GameScenes.MainMenu));
+                        Destroy(gameObject);
+                        yield break;
+                    }
+
+                    if (levels != null && levels.HasActiveClearRewards)
                     {
                         GoToInterLevel();
                         Destroy(gameObject);
@@ -324,7 +441,10 @@ namespace Soup.Game
                     map.ApplyAdvancementVisitPresentation();
                 }
 
-                FindObjectOfType<ZoneCameraController>()?.SnapToZone(AdvancementVisit.Zone);
+                ZoneViewFraming.ApplyZoneCamera(
+                    FindObjectOfType<ZoneCameraController>(),
+                    AdvancementVisit.Zone,
+                    snap: true);
                 FindObjectOfType<GameOverlayUI>()?.SetPlayHudVisible(false);
                 AdvancementVisitUI.Ensure();
                 Debug.Log($"[GameSessionLaunch] Advancement visit ready zone={AdvancementVisit.Zone}");

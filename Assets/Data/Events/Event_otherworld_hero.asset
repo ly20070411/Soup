@@ -18,7 +18,7 @@ MonoBehaviour:
   category: 0
   triggerMoment: 2
   weight: 1
-  canRepeat: 1
+  canRepeat: 0
   requiredStageIndex: 0
   exclusionGroup: 
   relatedJob: {fileID: 0}

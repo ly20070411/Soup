@@ -4,10 +4,13 @@ using UnityEngine.UI;
 namespace Soup.Game
 {
     /// <summary>
-    /// Shared floating tooltip used by HUD, shop, events, and world stations.
+    /// Shared floating tooltip used by HUD, shop, events, job picks, and world stations.
+    /// Same panel style as relic hovers (<see cref="RelicHudTooltip"/>).
     /// </summary>
     public sealed class HoverTooltipHub : MonoBehaviour
     {
+        private const int TipSortingOrder = 5000;
+
         private static HoverTooltipHub _instance;
 
         private RelicHudTooltip _tooltip;
@@ -18,7 +21,6 @@ namespace Soup.Game
             get
             {
                 if (_instance != null) return _instance;
-                // Never spawn hubs while a scene is tearing down.
                 if (!Application.isPlaying) return null;
                 _instance = FindObjectOfType<HoverTooltipHub>();
                 if (_instance != null) return _instance;
@@ -43,7 +45,7 @@ namespace Soup.Game
 
         public void Show(string title, string body, RectTransform anchor)
         {
-            EnsureTooltip();
+            EnsureTooltip(anchor);
             if (_tooltip == null) return;
             if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
             {
@@ -56,7 +58,7 @@ namespace Soup.Game
 
         public void ShowAtScreen(string title, string body, Vector2 screenPos)
         {
-            EnsureTooltip();
+            EnsureTooltip(null);
             if (_tooltip == null) return;
             if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
             {
@@ -75,22 +77,23 @@ namespace Soup.Game
 
         public void Hide() => _tooltip?.Hide();
 
-        private void EnsureTooltip()
+        private void EnsureTooltip(RectTransform preferredAnchor)
         {
-            if (_tooltip != null) return;
-
-            var host = ResolveHost();
+            Transform host = ResolveHost(preferredAnchor);
             if (host == null) return;
 
-            _tooltip = host.GetComponent<RelicHudTooltip>();
             if (_tooltip == null)
-                _tooltip = host.gameObject.AddComponent<RelicHudTooltip>();
+                _tooltip = GetComponent<RelicHudTooltip>();
+            if (_tooltip == null)
+                _tooltip = gameObject.AddComponent<RelicHudTooltip>();
+
             _tooltip.EnsureBuilt(host, GameOverlayUI.SharedUiFont());
+            _tooltip.EnsureTopMost(TipSortingOrder);
 
             if (_fallbackAnchor == null)
             {
                 var go = new GameObject("TooltipAnchor", typeof(RectTransform));
-                go.transform.SetParent(host, false);
+                go.transform.SetParent(transform, false);
                 _fallbackAnchor = go.GetComponent<RectTransform>();
                 _fallbackAnchor.anchorMin = _fallbackAnchor.anchorMax = new Vector2(0.5f, 0.5f);
                 _fallbackAnchor.sizeDelta = new Vector2(40f, 40f);
@@ -98,10 +101,58 @@ namespace Soup.Game
             }
         }
 
-        private static Transform ResolveHost()
+        private static Transform ResolveHost(RectTransform preferredAnchor)
         {
+            if (preferredAnchor != null)
+            {
+                var canvas = preferredAnchor.GetComponentInParent<Canvas>();
+                if (canvas != null)
+                {
+                    var root = canvas.rootCanvas != null ? canvas.rootCanvas : canvas;
+                    return root.transform;
+                }
+            }
+
+            var eventPanel = FindObjectOfType<EventPanelUI>();
+            if (eventPanel != null && eventPanel.IsOpen)
+            {
+                var eventCanvas = eventPanel.transform.Find(EventPanelUI.CanvasName);
+                if (eventCanvas != null)
+                    return eventCanvas;
+            }
+
+            var starter = FindObjectOfType<StarterJobSelectUI>();
+            if (starter != null)
+            {
+                var canvas = starter.GetComponentInChildren<Canvas>(true);
+                if (canvas != null && canvas.gameObject.activeInHierarchy)
+                    return canvas.transform;
+            }
+
+            var mainMenu = FindObjectOfType<MainMenuUI>();
+            if (mainMenu != null)
+            {
+                var canvasTf = mainMenu.transform.Find(MainMenuUI.CanvasName);
+                if (canvasTf != null && canvasTf.gameObject.activeInHierarchy)
+                    return canvasTf;
+            }
+
+            var visit = FindObjectOfType<AdvancementVisitUI>();
+            if (visit != null)
+            {
+                var canvas = visit.GetComponentInChildren<Canvas>(true);
+                if (canvas != null && canvas.gameObject.activeInHierarchy)
+                    return canvas.transform;
+            }
+
             var authored = FindObjectOfType<PlayAuthoredHud>();
-            if (authored != null) return authored.transform;
+            if (authored != null)
+            {
+                var canvas = authored.GetComponentInParent<Canvas>();
+                if (canvas != null)
+                    return (canvas.rootCanvas != null ? canvas.rootCanvas : canvas).transform;
+                return authored.transform;
+            }
 
             var overlay = FindObjectOfType<GameOverlayUI>();
             if (overlay != null)

@@ -14,14 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: pure_salt
   displayName: "\u7EAF\u6B63\u9999\u76D0"
-  description: "\u5728\u98CE\u5473\u5C0F\u4E8E\u7B49\u4E8E 1 \u79CD\u65F6\uFF0C\u6700\u7EC8\u500D\u7387\u589E\u52A0
-    0.5\u3002"
-  icon: {fileID: 0}
+  description: "\u5728\u98CE\u5473\u5C0F\u4E8E\u7B49\u4E8E1\u79CD\u65F6\uFF0C\u6700\u7EC8\u500D\u7387\u589E\u52A00.5\u3002"
+  icon: {fileID: 21300000, guid: e6b5d38184895c84e96c9fd518f2f56f, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 0
   rules:
-  - trigger: 2
+  - trigger: 4
     condition: 3
     conditionCategory: 99
     conditionInt: 1

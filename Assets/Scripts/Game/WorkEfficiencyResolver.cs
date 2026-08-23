@@ -1,3 +1,4 @@
+using Soup.Employees;
 using Soup.Jobs;
 using Soup.Relics;
 using UnityEngine;
@@ -49,9 +50,11 @@ namespace Soup.Game
                     aura += JobAdvanceGatherMods.SumIncomingDesignatedPairAllYieldBonus(job);
                     return aura;
                 case WorkEfficiencyScope.Process:
-                    return JobAdvanceGatherMods.SumIncomingProcessEfficiencyAura();
+                    return JobAdvanceGatherMods.SumIncomingProcessEfficiencyAura()
+                           + RelicEffectRunner.SumProcessLaborEfficiency();
                 case WorkEfficiencyScope.Cook:
-                    return JobAdvanceGatherMods.SumIncomingCookEfficiencyAura();
+                    return JobAdvanceGatherMods.SumIncomingCookEfficiencyAura()
+                           + RelicEffectRunner.SumCookLaborEfficiency();
                 default:
                     return 0f;
             }
@@ -61,16 +64,22 @@ namespace Soup.Game
         public static float ResolveGatherJobOwnEfficiency(
             JobItem job,
             JobAdvanceGatherMods mods,
-            int workers)
+            int workers,
+            bool consumePendingPenalty = true)
         {
             float own = 1f;
             if (mods.EfficiencyPerWorker > 0f && workers > 0)
                 own += workers * mods.EfficiencyPerWorker;
 
             var progression = JobProgressionManager.Instance;
-            float pendingPenalty = progression != null
-                ? progression.ConsumePendingGatherEfficiencyPenalty(job)
-                : 0f;
+            float pendingPenalty = 0f;
+            if (progression != null)
+            {
+                pendingPenalty = consumePendingPenalty
+                    ? progression.ConsumePendingGatherEfficiencyPenalty(job)
+                    : progression.PeekPendingGatherEfficiencyPenalty(job);
+            }
+
             if (pendingPenalty > 0f)
                 own -= pendingPenalty;
 
@@ -102,13 +111,14 @@ namespace Soup.Game
             WorkEfficiencyScope scope,
             JobAdvanceGatherMods gatherMods = default,
             int workers = 0,
-            int levelTurnNumber = -1)
+            int levelTurnNumber = -1,
+            bool consumePendingPenalty = true)
         {
             float incentiveFatigue = ResolveIncentiveFatigueEfficiency(levelTurnNumber);
             float relicTotal = ResolveRelicTotalEfficiency(levelTurnNumber);
             float aura = ResolveJobAuraBonus(job, scope);
             float own = scope == WorkEfficiencyScope.Gather
-                ? ResolveGatherJobOwnEfficiency(job, gatherMods, workers)
+                ? ResolveGatherJobOwnEfficiency(job, gatherMods, workers, consumePendingPenalty)
                 : 1f;
             float happy = ResolveHappyTuotuoEfficiency();
 
@@ -124,13 +134,34 @@ namespace Soup.Game
             JobAdvanceGatherMods gatherMods,
             float pureLabor,
             int workers,
-            int levelTurnNumber = -1)
+            int levelTurnNumber = -1,
+            bool consumePendingPenalty = true)
         {
             if (pureLabor <= 0f || workers <= 0) return 0f;
 
             float product = ResolveJobEfficiencyProduct(
-                job, WorkEfficiencyScope.Gather, gatherMods, workers, levelTurnNumber);
+                job, WorkEfficiencyScope.Gather, gatherMods, workers, levelTurnNumber, consumePendingPenalty);
             return product * pureLabor / workers;
+        }
+
+        /// <summary>悬停预览用：不消耗待结算效率惩罚。</summary>
+        public static float PreviewGatherConversionEfficiency(
+            JobItem job,
+            JobAdvanceGatherMods gatherMods,
+            float pureLabor,
+            int workers,
+            int levelTurnNumber = -1)
+        {
+            if (workers <= 0)
+            {
+                return ResolveJobEfficiencyProduct(
+                    job, WorkEfficiencyScope.Gather, gatherMods, 0, levelTurnNumber,
+                    consumePendingPenalty: false);
+            }
+
+            float labor = pureLabor > 0f ? pureLabor : workers;
+            return ResolveGatherConversionEfficiency(
+                job, gatherMods, labor, workers, levelTurnNumber, consumePendingPenalty: false);
         }
 
         /// <summary>处理/烹饪产能乘数（与 pureLabor × amountPerWorker 相乘）。</summary>
@@ -140,6 +171,36 @@ namespace Soup.Game
             int levelTurnNumber = -1)
         {
             return ResolveJobEfficiencyProduct(job, scope, default, 0, levelTurnNumber);
+        }
+
+        /// <summary>世界地图上岗位旁效率角标：有员工且倍率≠1 时展示。</summary>
+        public static float ResolveStationDisplayMultiplier(JobItem job)
+        {
+            if (job == null) return 1f;
+
+            var em = EmployeeManager.Instance;
+            int workers = em != null ? em.GetAssignedCountOnJob(job) : 0;
+            if (workers <= 0) return 1f;
+
+            switch (job.JobType)
+            {
+                case JobType.Gather:
+                {
+                    var progression = JobProgressionManager.Instance;
+                    var path = progression != null
+                        ? progression.GetAdvancePath(job)
+                        : JobAdvanceNodeId.None;
+                    var mods = JobAdvanceGatherMods.From(job, path);
+                    float labor = em.GetLaborOnJob(job);
+                    return PreviewGatherConversionEfficiency(job, mods, labor, workers);
+                }
+                case JobType.Process:
+                    return ResolveWorkCapacityMultiplier(job, WorkEfficiencyScope.Process);
+                case JobType.Cook:
+                    return ResolveWorkCapacityMultiplier(job, WorkEfficiencyScope.Cook);
+                default:
+                    return 1f;
+            }
         }
 
         private static int ResolveLevelTurn(int levelTurnNumber)

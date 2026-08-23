@@ -42,6 +42,75 @@ namespace Soup.Game
         public const int ColdProcessedPerFlavor = 2;
         public const int ColdCookedPerFlavor = 2;
         public const int ColdScorePerCooked = 2;
+        /// <summary>有烹饪员工时，每回合消耗当前鲜美的基础比例（遗物可在此基础上减少）。</summary>
+        public const float MagicConsumeBaseRate = 0.50f;
+        /// <summary>消耗鲜美后，每份剩余鲜美换算的分数。</summary>
+        public const int MagicScorePerRemainingFlavor = 3;
+
+        /// <summary>
+        /// 读取热辣倍率上限 / 遗物加成（预览与 HUD 共用）。
+        /// </summary>
+        public static void ResolveSpicyPreviewSettings(
+            ResourceStore store,
+            out float spicyMultiplierCap,
+            out bool spicyUncapped,
+            out float relicSpicyScoreMultiplierBonus)
+        {
+            spicyMultiplierCap = 0f;
+            spicyUncapped = false;
+            relicSpicyScoreMultiplierBonus = 0f;
+            if (store != null)
+            {
+                var config = store.Config;
+                if (config != null)
+                    spicyMultiplierCap = config.SpicyMultiplierCap;
+                else
+                {
+                    var loaded = Resources.Load<GameConfig>(ResourceStore.ResourcesConfigPath);
+                    if (loaded != null)
+                        spicyMultiplierCap = loaded.SpicyMultiplierCap;
+                }
+            }
+
+            var relics = RelicManager.Instance;
+            if (relics == null) return;
+
+            for (int i = 0; i < relics.Owned.Count; i++)
+            {
+                var relic = relics.Owned[i];
+                if (relic?.Rules == null) continue;
+                for (int r = 0; r < relic.Rules.Count; r++)
+                {
+                    var rule = relic.Rules[r];
+                    if (rule == null) continue;
+                    if (rule.Effect == RelicEffectType.DisableSpicyCap)
+                        spicyUncapped = true;
+                    if (rule.Effect == RelicEffectType.AddSpicyScoreMultiplier)
+                        relicSpicyScoreMultiplierBonus += rule.FloatValue;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 烹饪区热辣倍率展示：与顶栏当前「已烹饪食材」「热辣」一致，便于心算核对。
+        /// </summary>
+        public static float PreviewSpicyMultiplierForDisplay(ResourceStore store = null)
+        {
+            store ??= ResourceStore.Instance;
+            if (store == null) return 1f;
+
+            ResolveSpicyPreviewSettings(
+                store,
+                out float spicyCap,
+                out bool spicyUncapped,
+                out float spicyScoreBonus);
+            return ScoreMultiplierResolver.ComputeSpicyMultiplier(
+                store,
+                store.Cooked,
+                spicyCap,
+                spicyUncapped,
+                spicyScoreBonus);
+        }
 
         /// <summary>
         /// Preview using live store / elves / stage cooked, resolving spicy cap from config & relics.
@@ -55,40 +124,11 @@ namespace Soup.Game
             elves ??= ElfManager.Instance;
             turns ??= TurnManager.Instance;
 
-            float spicyCap = 3f;
-            bool spicyUncapped = false;
-            float spicyScoreBonus = 0f;
-            if (store != null)
-            {
-                var config = store.Config;
-                if (config != null)
-                    spicyCap = config.SpicyMultiplierCap;
-                else
-                {
-                    var loaded = Resources.Load<GameConfig>(ResourceStore.ResourcesConfigPath);
-                    if (loaded != null)
-                        spicyCap = loaded.SpicyMultiplierCap;
-                }
-            }
-
-            var relics = RelicManager.Instance;
-            if (relics != null)
-            {
-                for (int i = 0; i < relics.Owned.Count; i++)
-                {
-                    var relic = relics.Owned[i];
-                    if (relic?.Rules == null) continue;
-                    for (int r = 0; r < relic.Rules.Count; r++)
-                    {
-                        var rule = relic.Rules[r];
-                        if (rule == null) continue;
-                        if (rule.Effect == RelicEffectType.DisableSpicyCap)
-                            spicyUncapped = true;
-                        if (rule.Effect == RelicEffectType.AddSpicyScoreMultiplier)
-                            spicyScoreBonus += rule.FloatValue;
-                    }
-                }
-            }
+            ResolveSpicyPreviewSettings(
+                store,
+                out float spicyCap,
+                out bool spicyUncapped,
+                out float spicyScoreBonus);
 
             int stageCooked = turns != null ? turns.StageCooked : 0;
             return PreviewScores(store, elves, stageCooked, spicyCap, spicyUncapped, spicyScoreBonus);
@@ -107,7 +147,7 @@ namespace Soup.Game
         /// <summary>
         /// Preview score each flavor would provide without mutating game state.
         /// Cold / spicy / magic follow next-turn resolution order;
-        /// sour uses current stage cooked (大关结算口径).
+        /// sour uses warehouse cooked at turn end (回合结束结算口径).
         /// </summary>
         public static FlavorScoreBreakdown PreviewScores(
             ResourceStore store,
@@ -160,30 +200,24 @@ namespace Soup.Game
                 if (consumed <= 0) continue;
 
                 processed -= consumed;
-                cookedFromCook += consumed;
-                cookScoreBase += GameMath.CeilMul(consumed, scoreMultiplier);
+                int cookedNet = RelicEffectRunner.ApplyCookOutputWaste(consumed);
+                cookedFromCook += cookedNet;
+                cookScoreBase += GameMath.CeilMul(cookedNet, scoreMultiplier);
             }
 
             preview.CookScoreBase = cookScoreBase;
             cookedThisTurn += cookedFromCook;
             preview.CookedThisTurn = cookedThisTurn;
 
-            float spicyMult = ScoreMultiplierResolver.ComputeSpicyMultiplier(
-                store,
-                cookedThisTurn,
-                spicyMultiplierCap,
-                spicyUncapped,
-                relicSpicyScoreMultiplierBonus);
-            int cookAfterSpicy = cookScoreBase > 0
-                ? GameMath.CeilToInt(cookScoreBase * spicyMult)
-                : 0;
-            preview.SpicyMultiplier = cookScoreBase > 0 ? spicyMult : 1f;
-            preview.SpicyBonusScore = Mathf.Max(0, cookAfterSpicy - cookScoreBase);
+            // 热辣仅在关卡最后一回合乘总分；预览只展示当前倍率。
+            preview.SpicyMultiplier = PreviewSpicyMultiplierForDisplay(store);
+            preview.SpicyBonusScore = 0;
 
-            // Sour — stage settlement basis
-            preview.SourCookedBasis = Mathf.Max(0, stageCooked);
-            preview.SourUsable = Mathf.Min(store.Sour, preview.SourCookedBasis);
-            preview.SourScore = ScoreSour(preview.SourUsable, preview.SourCookedBasis);
+            // Sour — 大关结算按当前已烹饪食材总量换算
+            int cookedBasis = store.Cooked;
+            preview.SourCookedBasis = cookedBasis;
+            preview.SourUsable = Mathf.Min(store.Sour, cookedBasis);
+            preview.SourScore = ScoreSour(preview.SourUsable, cookedBasis);
 
             // Magic
             preview.MagicHasCookWorkers = HasCookWorkers(elves);
@@ -192,9 +226,8 @@ namespace Soup.Game
                 int magic = store.Magic;
                 int consumed = ComputeMagicConsumed(magic);
                 int remaining = magic - consumed;
-                int rawBonus = remaining * 3;
-                int cookedFoodScore = preview.ColdScore + cookAfterSpicy;
-                int bonus = Mathf.Min(rawBonus, cookedFoodScore);
+                int rawBonus = remaining * MagicScorePerRemainingFlavor;
+                int bonus = ComputeMagicBonusScore(remaining, cookedThisTurn);
 
                 preview.MagicConsumed = consumed;
                 preview.MagicRemaining = remaining;
@@ -260,9 +293,9 @@ namespace Soup.Game
         }
 
         /// <summary>
-        /// 热辣倍率仅作用于烹饪站分数（CookScoreBase 已含火力倍率）。
-        /// 完整结算见 <see cref="ScoreMultiplierResolver.ApplyCookScoreMultipliers"/>。
+        /// 热辣在关卡最后一回合乘总分结算；回合内不再作用于烹饪分。
         /// </summary>
+        [System.Obsolete("Spicy settles at level end; use TurnManager.TrySettleSpicyAtLevelEnd.")]
         public static void ApplySpicyToCookScore(
             ResourceStore store,
             TurnResult result,
@@ -275,7 +308,7 @@ namespace Soup.Game
 
             float spicyMult = ScoreMultiplierResolver.ComputeSpicyMultiplier(
                 store,
-                result.CookedGained,
+                store.Cooked,
                 spicyMultiplierCap,
                 spicyUncapped,
                 relicSpicyScoreMultiplierBonus);
@@ -288,77 +321,169 @@ namespace Soup.Game
         }
 
         /// <summary>
-        /// Progressive sour→score conversion vs cooked food.
-        /// Default tiers: &lt;=10% →5, &lt;=50% →3, &lt;=100% →1 (酸酸糖 raises top tier to 20%).
-        /// Only used at stage (大关) settlement — not each cook turn.
-        /// Scored sour is consumed; excess remains.
+        /// 大关 / 关底结算：按当前已烹饪食材总量换算酸涩分并消耗对应酸涩。
+        /// </summary>
+        public static void ResolveSourForSettlement(ResourceStore store, out int sourUsed, out int sourScore)
+        {
+            sourUsed = 0;
+            sourScore = 0;
+            if (store == null) return;
+
+            int cookedBasis = store.Cooked;
+            if (cookedBasis <= 0) return;
+
+            int sour = store.Sour;
+            if (sour <= 0) return;
+
+            sourUsed = Mathf.Min(sour, cookedBasis);
+            sourScore = ScoreSour(sourUsed, cookedBasis);
+            if (sourUsed <= 0 || sourScore <= 0) return;
+
+            store.ConsumeFlavorUpTo(FlavorType.Sour, sourUsed);
+        }
+
+        /// <summary>预览大关结算酸涩换分（只读，不消耗）。</summary>
+        public static int PreviewSourScore(ResourceStore store)
+        {
+            if (store == null) return 0;
+
+            int cookedBasis = store.Cooked;
+            if (cookedBasis <= 0) return 0;
+
+            int sour = store.Sour;
+            if (sour <= 0) return 0;
+
+            int sourUsed = Mathf.Min(sour, cookedBasis);
+            return ScoreSour(sourUsed, cookedBasis);
+        }
+
+        /// <summary>预览酸涩分档明细，供烹饪区悬停提示。</summary>
+        public static void PreviewSourDetail(
+            ResourceStore store,
+            out int cookedBasis,
+            out int sourAmount,
+            out int sourUsable,
+            out int totalScore,
+            out int tier1Count,
+            out int tier1Score,
+            out int tier2Count,
+            out int tier2Score,
+            out int tier3Count,
+            out int tier3Score)
+        {
+            cookedBasis = store != null ? store.Cooked : 0;
+            sourAmount = store != null ? store.Sour : 0;
+            sourUsable = cookedBasis > 0 ? Mathf.Min(sourAmount, cookedBasis) : 0;
+            ScoreSour(
+                sourUsable,
+                cookedBasis,
+                out totalScore,
+                out tier1Count,
+                out tier1Score,
+                out tier2Count,
+                out tier2Score,
+                out tier3Count,
+                out tier3Score);
+        }
+
+        [System.Obsolete("Sour settles at stage end; use ResolveSourForSettlement.")]
+        public static void ResolveSourForTurn(ResourceStore store, TurnResult result)
+        {
+            if (store == null || result == null) return;
+
+            ResolveSourForSettlement(store, out int sourUsed, out int sourScore);
+            if (sourUsed <= 0 || sourScore <= 0) return;
+
+            result.SourUsed += sourUsed;
+            result.SourScore += sourScore;
+            result.ScoreGained += sourScore;
+        }
+
+        /// <summary>
+        /// 兼容旧调用：按给定烹饪量结算酸涩（大关手动结算等）。
         /// </summary>
         public static void ResolveSourForSettlement(
             ResourceStore store,
-            int cookedInStage,
+            int cookedAmount,
             out int sourUsed,
             out int sourScore)
         {
             sourUsed = 0;
             sourScore = 0;
-            if (store == null || cookedInStage <= 0) return;
+            if (store == null || cookedAmount <= 0) return;
 
             int sour = store.Sour;
             if (sour <= 0) return;
 
-            sourUsed = Mathf.Min(sour, cookedInStage);
-            sourScore = ScoreSour(sourUsed, cookedInStage);
+            sourUsed = Mathf.Min(sour, cookedAmount);
+            sourScore = ScoreSour(sourUsed, cookedAmount);
             if (sourUsed > 0)
                 store.ConsumeFlavorUpTo(FlavorType.Sour, sourUsed);
         }
 
-        [System.Obsolete("Sour settles at stage end. Use ResolveSourForSettlement.")]
+        [System.Obsolete("Use ResolveSourForSettlement.")]
         public static void ResolveSour(ResourceStore store, TurnResult result)
         {
-            if (store == null || result == null) return;
-            ResolveSourForSettlement(store, result.CookedGained, out int used, out int score);
-            result.SourUsed += used;
-            result.SourScore += score;
-            result.ScoreGained += score;
+            ResolveSourForTurn(store, result);
         }
 
         /// <summary>
         /// Progressive sour→score conversion vs cooked food.
-        /// Default tiers: &lt;=10% →5, &lt;=50% →3, &lt;=100% →1.
-        /// Top-tier percent can be raised by relics (酸酸糖 → 20%).
+        /// Default tiers: &lt;=10% →3, &lt;=50% →2, &lt;=100% →1.
+        /// Top-tier percent can be raised by relics (酸酸糖 → 30%).
+        /// Second-tier ceiling can be raised (酸酸糖 → 70%).
         /// </summary>
-        public static int ScoreSour(int sourAmount, int cookedAmount)
+        public static int ScoreSour(int sourAmount, int cookedAmount) =>
+            ScoreSour(sourAmount, cookedAmount, out _, out _, out _, out _, out _, out _, out _);
+
+        public static int ScoreSour(
+            int sourAmount,
+            int cookedAmount,
+            out int totalScore,
+            out int tier1Count,
+            out int tier1Score,
+            out int tier2Count,
+            out int tier2Score,
+            out int tier3Count,
+            out int tier3Score)
         {
+            totalScore = 0;
+            tier1Count = tier1Score = tier2Count = tier2Score = tier3Count = tier3Score = 0;
+
             if (sourAmount <= 0 || cookedAmount <= 0) return 0;
 
             int topTierPercent = RelicEffectRunner.ResolveSourTopTierPercent(10);
             topTierPercent = Mathf.Clamp(topTierPercent, 1, 50);
+            int secondTierPercent = RelicEffectRunner.ResolveSourSecondTierPercent(50);
+            secondTierPercent = Mathf.Clamp(secondTierPercent, topTierPercent + 1, 99);
 
             int tier1End = GameMath.CeilDiv(cookedAmount * topTierPercent, 100);
-            int tier2End = GameMath.CeilDiv(cookedAmount * 50, 100); // <=50%
+            int tier2End = GameMath.CeilDiv(cookedAmount * secondTierPercent, 100);
             int tier3End = cookedAmount;                             // <=100%
 
             int remaining = Mathf.Min(sourAmount, cookedAmount);
-            int score = 0;
 
-            int take1 = Mathf.Min(remaining, tier1End);
-            score += take1 * 5;
-            remaining -= take1;
+            tier1Count = Mathf.Min(remaining, tier1End);
+            tier1Score = tier1Count * 3;
+            totalScore += tier1Score;
+            remaining -= tier1Count;
 
-            int take2 = Mathf.Min(remaining, Mathf.Max(0, tier2End - tier1End));
-            score += take2 * 3;
-            remaining -= take2;
+            tier2Count = Mathf.Min(remaining, Mathf.Max(0, tier2End - tier1End));
+            tier2Score = tier2Count * 2;
+            totalScore += tier2Score;
+            remaining -= tier2Count;
 
-            int take3 = Mathf.Min(remaining, Mathf.Max(0, tier3End - tier2End));
-            score += take3 * 1;
+            tier3Count = Mathf.Min(remaining, Mathf.Max(0, tier3End - tier2End));
+            tier3Score = tier3Count * 1;
+            totalScore += tier3Score;
 
-            return score;
+            return totalScore;
         }
 
         /// <summary>
-        /// If any cook workers are assigned: consume 30% of magic (ceil),
-        /// reduced by relics (科技与狠活), bonus = remaining * 3,
-        /// capped by this turn's cooked-food score (cold + spicy-boosted cook).
+        /// If any cook workers are assigned: consume 50% of magic (ceil),
+        /// reduced by relics (科技与狠活), bonus = remaining ×3,
+        /// capped by this turn's cooked ingredient count (not cook score).
         /// </summary>
         public static void ResolveMagic(ElfManager elves, ResourceStore store, TurnResult result)
         {
@@ -372,22 +497,31 @@ namespace Soup.Game
             int remaining = magic - consumed;
             store.ConsumeFlavorUpTo(FlavorType.Magic, consumed);
 
-            int rawBonus = remaining * 3;
-            int cookedFoodScore = result.ColdScore + result.CookScore;
-            int bonus = Mathf.Min(rawBonus, cookedFoodScore);
+            int bonus = ComputeMagicBonusScore(remaining, result.CookedGained);
             result.MagicConsumed += consumed;
             result.MagicScore += bonus;
             result.ScoreGained += bonus;
         }
 
         /// <summary>
-        /// Base magic consume rate is 30%; relics can remove a fraction of that rate
-        /// (0.1 → consume 27%).
+        /// 鲜美得分 = min(剩余鲜美 × MagicScorePerRemainingFlavor, 本回合已烹饪食材份数)。
+        /// </summary>
+        public static int ComputeMagicBonusScore(int magicRemaining, int cookedGainedThisTurn)
+        {
+            if (magicRemaining <= 0 || cookedGainedThisTurn <= 0)
+                return 0;
+            int rawBonus = magicRemaining * MagicScorePerRemainingFlavor;
+            return Mathf.Min(rawBonus, cookedGainedThisTurn);
+        }
+
+        /// <summary>
+        /// Base magic consume rate is 50%; relics subtract from that rate in absolute terms
+        /// (科技与狠活 0.2 → consume 30%).
         /// </summary>
         public static int ComputeMagicConsumed(int magic)
         {
             if (magic <= 0) return 0;
-            float rate = 0.30f * (1f - RelicEffectRunner.SumMagicConsumeReduction());
+            float rate = MagicConsumeBaseRate - RelicEffectRunner.SumMagicConsumeReduction();
             rate = Mathf.Clamp01(rate);
             int percent = Mathf.Max(0, Mathf.RoundToInt(rate * 100f));
             return Mathf.Min(magic, GameMath.CeilDiv(magic * percent, 100));

@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: kitchen_accident
   displayName: "\u53A8\u623F\u4E8B\u6545"
-  description: "\u6700\u7EC8\u500D\u7387 -0.1\u3002\u53EF\u91CD\u590D\u83B7\u5F97\u3002"
-  icon: {fileID: 0}
+  description: "\u6700\u7EC8\u500D\u7387\u51CF0.1\uFF0C\u53EF\u91CD\u590D\u83B7\u5F97\u3002"
+  icon: {fileID: 21300000, guid: cdd53e3557f680c4fb9a7afbef2ffaec, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 1

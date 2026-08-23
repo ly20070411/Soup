@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: stage_2
   displayName: "\u7B2C\u4E8C\u5173"
-  description: "\u76EE\u6807\u66F4\u9AD8\uFF0C\u56DE\u5408\u7565\u589E\u3002\u6CE8\u610F\u4ED3\u5E93\u4E0E\u5C97\u4F4D\u642D\u914D\u3002"
+  description: "10 \u56DE\u5408\u5185\u8FBE\u5230 10000 \u5206\u5373\u53EF\u901A\u5173\u3002"
   orderIndex: 2
-  targetScore: 80
-  maxTurns: 12
+  targetScore: 10000
+  maxTurns: 10
+  challengeScore: 12000

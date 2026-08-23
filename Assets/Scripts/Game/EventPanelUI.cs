@@ -13,22 +13,59 @@ namespace Soup.Game
 {
     /// <summary>
     /// 事件界面：场景变暗 + 面板上滑进入；选项内遗物/员工名加粗并可悬停看效果；
-    /// 点外侧返回；选择或返回时下滑移出。
+    /// 须选择选项后关闭（不可点空白处返回）。
     /// </summary>
     public sealed class EventPanelUI : MonoBehaviour
     {
+        public const string CanvasName = "EventPanelCanvas";
+        private const string AuthoredTemplateResourcePath = "UI/EventPanelAuthoredCanvas";
+
         private const int MaxOptions = 5;
         private const float AnimSeconds = 0.32f;
-        private const float HiddenY = -920f;
+        private const float HiddenY = -1300f;
         private const float ShownY = 0f;
+        private const int LayoutVersion = 17;
+        // Near full-screen parchment; content sits inside with margin.
+        private const float SheetWidth = 1912f;
+        private const float SheetHeight = 1060f;
+        // 羊皮 733x511 拉到 SheetHeight：书写区约从贴图顶 80px 起 → 约 166 sheet-px；再留余量。
+        private const float ParchmentTopSafe = 220f;
+        private const float ParchmentBottomSafe = 160f;
+        // 描述每行提前约 1 个汉字换行（相对视口宽度内缩一格）。
+        private const float DescWrapOneCharInset = 36f;
+        private const float IllustrationColumnMaxX = 0.48f;
+        private const float RightColumnMinX = 0.50f;
+        /// <summary>事件插画相对布局参考区内缩（外框已移除，默认不内缩）。</summary>
+        private const float IllustrationArtInset = 0f;
+        /// <summary>场景里手调外框的最小有效边长；低于此值视为未配置，走自动布局。</summary>
+        private const float MinAuthoredIllustrationSide = 64f;
+        private const float OptionFontSize = 24;
+        private const float OptionMinHeight = 68f;
+        private const float OptionPreferredWidth = 380f;
+        private const float OptionAnchorInsetX = 0.14f;
+
+        [SerializeField]
+        [Tooltip("勾选后使用场景里的 EventPanelCanvas，运行时不再强制改 Sheet 尺寸。")]
+        private bool useAuthoredLayout;
+
+        [SerializeField]
+        private int authoredLayoutVersion;
+
+        [SerializeField]
+        [Tooltip("勾选后不再自动改插画外框位置/大小；在 EventPanelCanvas 里直接调 IllustrationFrame / Illustration 即可。")]
+        private bool manualIllustrationLayout = true;
 
         private Canvas _canvas;
         private CanvasGroup _dimGroup;
         private RectTransform _sheetRect;
         private CanvasGroup _sheetGroup;
+        private Image _sheetBackground;
         private Text _titleText;
         private Text _descText;
+        private ScrollRect _descScroll;
         private Image _illustrationImage;
+        private Image _illustrationFrame;
+        private RectTransform _illustrationColumn;
         private Text _illustrationHint;
         private readonly OptionSlot[] _options = new OptionSlot[MaxOptions];
         private GameObject _tooltipRoot;
@@ -37,11 +74,18 @@ namespace Soup.Game
         private RectTransform _tooltipRect;
 
         private bool _built;
+        private int _builtLayoutVersion;
         private bool _open;
         private bool _animating;
         private Coroutine _animCo;
         private Coroutine _afterChoiceCo;
+        private Coroutine _layoutCo;
         private Action<string> _toast;
+
+        public bool UseAuthoredLayout => useAuthoredLayout;
+        public bool ManualIllustrationLayout => manualIllustrationLayout;
+        public RectTransform SheetRect => _sheetRect;
+        public Canvas PanelCanvas => _canvas;
 
         private struct NameSpan
         {
@@ -116,6 +160,9 @@ namespace Soup.Game
             if (_open && !_animating)
             {
                 Populate(item);
+                if (_layoutCo != null)
+                    StopCoroutine(_layoutCo);
+                _layoutCo = StartCoroutine(ApplyLayoutAfterVisible());
                 return;
             }
 
@@ -157,13 +204,26 @@ namespace Soup.Game
         public bool Show(bool animate)
         {
             EnsureBuilt();
+            if (!IsUiBindHealthy())
+            {
+                TearDownBuiltUi();
+                EnsureBuilt();
+            }
+
             var pending = EventManager.Instance != null ? EventManager.Instance.PendingEvent : null;
             if (pending == null)
+                return false;
+
+            if (!IsUiBindHealthy())
                 return false;
 
             Populate(pending);
             SetVisibleRoot(true);
             _open = true;
+
+            if (_layoutCo != null)
+                StopCoroutine(_layoutCo);
+            _layoutCo = StartCoroutine(ApplyLayoutAfterVisible());
 
             if (_animCo != null)
                 StopCoroutine(_animCo);
@@ -183,12 +243,6 @@ namespace Soup.Game
             if (_animCo != null)
                 StopCoroutine(_animCo);
             _animCo = StartCoroutine(AnimateOut(animate));
-        }
-
-        private void OnDimClicked()
-        {
-            if (_animating || !_open) return;
-            Hide(animate: true);
         }
 
         private void OnOptionClicked(int index)
@@ -218,10 +272,25 @@ namespace Soup.Game
             if (_titleText != null)
                 _titleText.text = item.DisplayName;
             if (_descText != null)
+            {
                 _descText.text = item.Description ?? string.Empty;
+                RefreshDescriptionLayout();
+            }
 
-            if (_illustrationHint != null)
+            if (_illustrationHint != null && !useAuthoredLayout)
                 _illustrationHint.text = "插画（待定）";
+
+            if (!ShouldUseManualIllustrationLayout())
+            {
+                NormalizeIllustrationHierarchy();
+                ApplyEventIllustrationFrameArt();
+                ApplyEventIllustration(item);
+                LayoutIllustrationPort();
+            }
+            else
+            {
+                ApplyEventIllustration(item);
+            }
 
             var options = item.Options;
             for (int i = 0; i < MaxOptions; i++)
@@ -246,7 +315,31 @@ namespace Soup.Game
             }
 
             HideTooltip();
+            if (!useAuthoredLayout)
+                ApplyOptionsPresentation();
             Canvas.ForceUpdateCanvases();
+            for (int i = 0; i < MaxOptions; i++)
+                _options[i]?.Hover?.RebuildHitAreas();
+        }
+
+        private IEnumerator ApplyLayoutAfterVisible()
+        {
+            yield return null;
+            _layoutCo = null;
+            Canvas.ForceUpdateCanvases();
+            if (!ShouldUseManualIllustrationLayout())
+            {
+                NormalizeIllustrationHierarchy();
+                ApplyEventIllustrationFrameArt();
+                LayoutIllustrationPort();
+            }
+
+            var pending = EventManager.Instance != null ? EventManager.Instance.PendingEvent : null;
+            if (pending != null)
+                ApplyEventIllustration(pending);
+            if (!useAuthoredLayout)
+                ApplyOptionsPresentation();
+            RefreshDescriptionLayout();
             for (int i = 0; i < MaxOptions; i++)
                 _options[i]?.Hover?.RebuildHitAreas();
         }
@@ -369,32 +462,23 @@ namespace Soup.Game
 
         private void ShowTooltip(string title, string body, Vector2 screenPos)
         {
-            if (_tooltipRoot == null) return;
-            _tooltipRoot.SetActive(true);
-            if (_tooltipTitle != null)
-                _tooltipTitle.text = title ?? string.Empty;
-            if (_tooltipBody != null)
-                _tooltipBody.text = body ?? string.Empty;
-
-            Canvas.ForceUpdateCanvases();
-            if (_tooltipRect != null && _canvas != null)
+            if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
             {
-                RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    _canvas.transform as RectTransform,
-                    screenPos,
-                    _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera,
-                    out var local);
-                var size = _tooltipRect.sizeDelta;
-                local += new Vector2(18f, 18f);
-                // Keep on screen roughly.
-                var canvasRect = (_canvas.transform as RectTransform).rect;
-                local.x = Mathf.Clamp(local.x, canvasRect.xMin + size.x * 0.5f + 8f, canvasRect.xMax - size.x * 0.5f - 8f);
-                local.y = Mathf.Clamp(local.y, canvasRect.yMin + size.y * 0.5f + 8f, canvasRect.yMax - size.y * 0.5f - 8f);
-                _tooltipRect.anchoredPosition = local;
+                HideTooltip();
+                return;
             }
+
+            DisableLegacyTooltip();
+            HoverTooltipHub.Instance.ShowAtScreen(title, body, screenPos);
         }
 
         private void HideTooltip()
+        {
+            HoverTooltipHub.HideIfPresent();
+            DisableLegacyTooltip();
+        }
+
+        private void DisableLegacyTooltip()
         {
             if (_tooltipRoot != null)
                 _tooltipRoot.SetActive(false);
@@ -481,6 +565,7 @@ namespace Soup.Game
         {
             if (_canvas != null)
                 _canvas.gameObject.SetActive(visible);
+            EventIllustrationLayoutResolver.SetWorldPlaceholdersVisible(!visible);
         }
 
         private void Toast(string message)
@@ -501,10 +586,900 @@ namespace Soup.Game
 
         private void EnsureBuilt()
         {
-            if (_built) return;
+            if (_built && _builtLayoutVersion != LayoutVersion)
+            {
+                useAuthoredLayout = false;
+                TearDownBuiltUi();
+            }
+
+            if (_built && !IsUiBindHealthy())
+            {
+                useAuthoredLayout = false;
+                TearDownBuiltUi();
+            }
+
+            if (FindBestAuthoredCanvasTransform() == null)
+                TryInstantiateAuthoredTemplate();
+
+            if (TryUseAuthoredCanvas())
+                return;
+
+            if (TryBuildInterLevelFormat())
+                return;
+
+            PurgeOrphanEventPanelCanvases();
+            ClearBoundUiRefs();
+
+            if (!_built)
+            {
+                Build();
+                _built = true;
+                _builtLayoutVersion = LayoutVersion;
+                authoredLayoutVersion = LayoutVersion;
+                useAuthoredLayout = false;
+                manualIllustrationLayout = false;
+                ConfigureDescriptionText();
+                SetVisibleRoot(false);
+                WireOptionClicks();
+            }
+
+            if (!useAuthoredLayout)
+            {
+                ApplyEventPanelArt();
+                EnsureSheetFrameSize();
+            }
+
+            ApplyEventIllustrationFrameArt();
+            NormalizeIllustrationHierarchy();
+            LayoutIllustrationPort();
+            if (!useAuthoredLayout)
+                ApplyOptionsPresentation();
+        }
+
+        /// <summary>玩法场景：优先 Resources 预制体，失败时再程序化 Build。</summary>
+        private bool TryBuildInterLevelFormat()
+        {
+            if (FindBestAuthoredCanvasTransform() == null)
+                TryInstantiateAuthoredTemplate();
+
+            if (TryBindAuthored() && IsUiBindHealthy())
+            {
+                FinishAuthoredEventPanelSetup();
+                return true;
+            }
+
+            PurgeOrphanEventPanelCanvases();
+            ClearBoundUiRefs();
+
             Build();
             _built = true;
+            _builtLayoutVersion = LayoutVersion;
+            authoredLayoutVersion = LayoutVersion;
+            useAuthoredLayout = true;
+            manualIllustrationLayout = true;
+
+            ConfigureDescriptionText();
+            WireOptionClicks();
+            ApplyEventPanelArt();
+            ApplyEventIllustrationFrameArt();
+            NormalizeIllustrationHierarchy();
+            LayoutIllustrationPort();
             SetVisibleRoot(false);
+            return true;
+        }
+
+        /// <summary>绑定场景/预制体画布；运行时不改 Rect，只接事件数据。</summary>
+        private void FinishAuthoredEventPanelSetup()
+        {
+            authoredLayoutVersion = LayoutVersion;
+            _built = true;
+            _builtLayoutVersion = LayoutVersion;
+            ApplyAuthoredLayoutFlagsFromCanvas(_canvas != null ? _canvas.transform : null);
+
+            ConfigureDescriptionText();
+            WireOptionClicks();
+            ApplyEventIllustrationFrameArt();
+            if (!ShouldUseManualIllustrationLayout())
+                NormalizeIllustrationHierarchy();
+            LayoutIllustrationPort();
+            if (!useAuthoredLayout)
+                ApplyOptionsPresentation();
+            EnsureEventPanelTextFonts();
+            if (Application.isPlaying && !_open)
+                SetVisibleRoot(false);
+        }
+
+
+        private void ApplyInterLevelLayoutData(EventPanelAuthoredLayoutData data)
+        {
+            if (data == null || _sheetRect == null)
+                return;
+
+            var body = _sheetRect.Find("Body") as RectTransform;
+            if (body != null)
+            {
+                body.anchorMin = Vector2.zero;
+                body.anchorMax = Vector2.one;
+                body.pivot = new Vector2(0.5f, 0.5f);
+                body.offsetMin = Vector2.zero;
+                body.offsetMax = Vector2.zero;
+                body.anchoredPosition = data.bodyAnchoredPosition;
+                body.sizeDelta = data.bodySizeDelta;
+            }
+
+            NormalizeIllustrationHierarchy();
+            ApplyAnchoredRect(_illustrationFrame?.rectTransform, data.illustrationFramePosition, data.illustrationFrameSize);
+            ApplyAnchoredRect(_illustrationImage?.rectTransform, data.illustrationPosition, data.illustrationSize);
+        }
+
+        private static void ApplyAnchoredRect(RectTransform rect, Vector2 position, Vector2 size)
+        {
+            if (rect == null)
+                return;
+
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.zero;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+        }
+
+        private bool IsUiBindHealthy()
+        {
+            return _canvas != null
+                && _sheetRect != null
+                && _titleText != null
+                && _descText != null;
+        }
+
+        private void PurgeOrphanEventPanelCanvases()
+        {
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                var child = transform.GetChild(i);
+                if (child.name == CanvasName)
+                    DestroyImmediateSafe(child.gameObject, immediate: true);
+            }
+        }
+
+        /// <summary>场景里已有 EventPanelCanvas 时沿用编辑布局，避免运行时被程序化重建覆盖。</summary>
+        private bool TryUseAuthoredCanvas()
+        {
+            if (!TryBindAuthored() || !IsUiBindHealthy())
+            {
+                ClearBoundUiRefs();
+                return false;
+            }
+
+            useAuthoredLayout = true;
+            FinishAuthoredEventPanelSetup();
+            return true;
+        }
+
+        /// <summary>玩法场景无场景画布时，从 Resources 实例化关卡间同款 EventPanelCanvas。</summary>
+        private bool TryInstantiateAuthoredTemplate()
+        {
+            if (FindBestAuthoredCanvasTransform() != null)
+                return false;
+
+            var prefab = Resources.Load<GameObject>(AuthoredTemplateResourcePath);
+            if (prefab == null)
+                return false;
+
+            var instance = Instantiate(prefab, transform, false);
+            instance.name = CanvasName;
+            instance.transform.localScale = Vector3.one;
+
+            if (instance.GetComponent<EventPanelAuthoredTemplateMarker>() == null)
+                instance.gameObject.AddComponent<EventPanelAuthoredTemplateMarker>();
+
+            return true;
+        }
+
+        private void ApplyAuthoredLayoutFlagsFromCanvas(Transform canvasTf)
+        {
+            if (canvasTf == null)
+                return;
+
+            var marker = canvasTf.GetComponent<EventPanelAuthoredTemplateMarker>();
+            if (marker != null)
+            {
+                useAuthoredLayout = marker.UseAuthoredLayout;
+                manualIllustrationLayout = marker.ManualIllustrationLayout;
+                return;
+            }
+
+            manualIllustrationLayout = HasValidAuthoredIllustrationLayout();
+        }
+
+        private static void DestroyImmediateSafe(GameObject go, bool immediate = false)
+        {
+            if (go == null) return;
+            if (immediate || !Application.isPlaying)
+                UnityEngine.Object.DestroyImmediate(go);
+            else
+                UnityEngine.Object.Destroy(go);
+        }
+
+        /// <summary>Editor：提交插画外框布局（自由画布或当前 IllustrationFrame）。</summary>
+        public bool EditorCommitIllustrationLayout()
+        {
+            if (!TryBindAuthored() || !IsUiBindHealthy())
+            {
+                useAuthoredLayout = false;
+                TearDownBuiltUi(immediate: true);
+                Build();
+                _built = true;
+                _builtLayoutVersion = LayoutVersion;
+            }
+
+            NormalizeIllustrationHierarchy();
+            if (_illustrationColumn == null || _illustrationFrame == null)
+                return false;
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_illustrationColumn);
+
+            var frameRt = _illustrationFrame.rectTransform;
+            if (frameRt.sizeDelta.x < 1f && frameRt.sizeDelta.y < 1f)
+                return false;
+
+            // 手动模式：只读 IllustrationFrame，绝不走自由画布解析，也不改外框/插画本身。
+            if (manualIllustrationLayout)
+            {
+                WriteIllustrationLayoutMarker(frameRt.anchoredPosition, frameRt.sizeDelta);
+                authoredLayoutVersion = LayoutVersion;
+                useAuthoredLayout = true;
+                ApplyEventIllustrationFrameArt();
+                LayoutIllustrationPort();
+                return true;
+            }
+
+            Vector2 center;
+            float side;
+            if (EventIllustrationLayoutResolver.TryResolve(
+                    _sheetRect, _illustrationColumn, _canvas, out center, out side))
+            {
+                PlaceIllustrationSquare(frameRt, center.x, center.y, side, 0f);
+                PlaceIllustrationSquare(_illustrationImage?.rectTransform, center.x, center.y, side, IllustrationArtInset);
+                WriteIllustrationLayoutMarker(frameRt.anchoredPosition, frameRt.sizeDelta);
+            }
+            else
+            {
+                WriteIllustrationLayoutMarker(frameRt.anchoredPosition, frameRt.sizeDelta);
+            }
+
+            manualIllustrationLayout = true;
+            authoredLayoutVersion = LayoutVersion;
+            useAuthoredLayout = true;
+            ApplyEventIllustrationFrameArt();
+            LayoutIllustrationPort();
+            return true;
+        }
+
+        private void WriteIllustrationLayoutMarker(Vector2 position, Vector2 size)
+        {
+            if (_illustrationColumn == null)
+                return;
+
+            var markerTf = FindDeepTransform(_illustrationColumn, EventIllustrationLayoutResolver.LayoutMarkerName);
+            RectTransform marker;
+            if (markerTf == null)
+            {
+                var go = new GameObject(EventIllustrationLayoutResolver.LayoutMarkerName, typeof(RectTransform));
+                marker = go.GetComponent<RectTransform>();
+                marker.SetParent(_illustrationColumn, false);
+            }
+            else
+            {
+                marker = markerTf as RectTransform;
+            }
+
+            if (marker == null)
+                return;
+
+            marker.anchorMin = Vector2.zero;
+            marker.anchorMax = Vector2.zero;
+            marker.pivot = new Vector2(0.5f, 0.5f);
+            marker.anchoredPosition = position;
+            marker.sizeDelta = size;
+        }
+
+        /// <summary>Editor：把自由画布里的「事件外框」烘焙为 EventIllustrationLayout 标记。</summary>
+        public bool EditorBakeIllustrationLayoutFromFreeDraw()
+        {
+            // 保留旧入口；手动模式下仍只提交 IllustrationFrame。
+            return EditorCommitIllustrationLayout();
+        }
+
+        /// <summary>Editor：重建场景内画布并展开预览。</summary>
+        public void EditorRebuildAuthoredCanvas(bool showForEditing)
+        {
+            useAuthoredLayout = false;
+            manualIllustrationLayout = false;
+            TearDownBuiltUi(immediate: true);
+            Build();
+            _built = true;
+            _builtLayoutVersion = LayoutVersion;
+            authoredLayoutVersion = LayoutVersion;
+            ConfigureDescriptionText();
+            ApplyEventPanelArt();
+            EnsureSheetFrameSize();
+            WireOptionClicks();
+            ApplyEventIllustrationFrameArt();
+            NormalizeIllustrationHierarchy();
+            LayoutIllustrationPort();
+            var previewSprite = EventIllustrationLibrary.Load()?.Resolve("blessing_goddess_1");
+            if (previewSprite != null && _illustrationImage != null)
+            {
+                _illustrationImage.sprite = previewSprite;
+                _illustrationImage.color = Color.white;
+                _illustrationImage.preserveAspect = false;
+                if (_illustrationHint != null)
+                    _illustrationHint.gameObject.SetActive(false);
+            }
+            ApplyOptionsPresentation();
+
+            if (_titleText != null)
+                _titleText.text = "祝福女神";
+            if (_descText != null)
+            {
+                _descText.text = "预览：羊皮铺满屏幕，插画与选项已缩小收在框内。长描述会自动换行，超出区域可滚动，不会画出边框。";
+                RefreshDescriptionLayout();
+            }
+            for (int i = 0; i < MaxOptions; i++)
+            {
+                var slot = _options[i];
+                if (slot == null || slot.Root == null) continue;
+                slot.Root.SetActive(i < 2);
+                if (slot.Label != null && i < 2)
+                    slot.Label.text = i == 0
+                        ? "我希望能找到更多采集物——获得 丰饶祝福"
+                        : "我希望手下人干劲满满——消除所有 疲倦，获得两个 激励";
+            }
+
+            if (showForEditing)
+            {
+                SetVisibleRoot(true);
+                SetAnimState(0.72f, ShownY);
+            }
+            else
+            {
+                SetVisibleRoot(false);
+                SetAnimState(0f, HiddenY);
+            }
+
+            useAuthoredLayout = true;
+            manualIllustrationLayout = true;
+        }
+
+        private bool TryBindAuthored()
+        {
+            var canvasTf = FindBestAuthoredCanvasTransform();
+            if (canvasTf == null) return false;
+
+            PruneExtraEventPanelCanvases(canvasTf);
+            canvasTf.localScale = Vector3.one;
+
+            _canvas = canvasTf.GetComponent<Canvas>();
+            if (_canvas == null) return false;
+
+            var dim = canvasTf.Find("Dim");
+            _dimGroup = dim != null ? dim.GetComponent<CanvasGroup>() : null;
+
+            var sheet = canvasTf.Find("Sheet");
+            if (sheet == null) return false;
+            _sheetRect = sheet as RectTransform ?? sheet.GetComponent<RectTransform>();
+            _sheetGroup = sheet.GetComponent<CanvasGroup>();
+            _sheetBackground = sheet.GetComponent<Image>();
+
+            _titleText = FindDeep<Text>(sheet, "Title");
+            _descText = FindDeep<Text>(sheet, "Description");
+            _descScroll = FindDeep<ScrollRect>(sheet, "DescViewport");
+            if (_descScroll == null && _descText != null)
+                _descScroll = _descText.GetComponentInParent<ScrollRect>();
+            _illustrationImage = FindDeep<Image>(sheet, "Illustration");
+            _illustrationFrame = FindDeep<Image>(sheet, "IllustrationFrame");
+            _illustrationColumn = FindDeepTransform(sheet, "IllustrationColumn") as RectTransform;
+            if (_illustrationColumn == null && _illustrationImage != null)
+                _illustrationColumn = _illustrationImage.transform.parent as RectTransform;
+            _illustrationHint = FindDeep<Text>(sheet, "IllustHint");
+
+            var optionsRoot = FindDeepTransform(sheet, "Options");
+            for (int i = 0; i < MaxOptions; i++)
+            {
+                Transform opt = optionsRoot != null ? optionsRoot.Find($"Option{i}") : FindDeepTransform(sheet, $"Option{i}");
+                if (opt == null)
+                {
+                    _options[i] = null;
+                    continue;
+                }
+
+                var label = opt.Find("Label") != null ? opt.Find("Label").GetComponent<Text>() : opt.GetComponentInChildren<Text>(true);
+                var hover = label != null ? label.GetComponent<RichNameHover>() : null;
+                if (label != null && hover == null)
+                    hover = label.gameObject.AddComponent<RichNameHover>();
+
+                _options[i] = new OptionSlot
+                {
+                    Root = opt.gameObject,
+                    Button = opt.GetComponent<Button>(),
+                    Label = label,
+                    Hover = hover,
+                    Index = i
+                };
+            }
+
+            var tip = canvasTf.Find("Tooltip");
+            if (tip != null)
+            {
+                _tooltipRoot = tip.gameObject;
+                _tooltipRect = tip as RectTransform ?? tip.GetComponent<RectTransform>();
+                _tooltipTitle = FindDeep<Text>(tip, "TipTitle");
+                _tooltipBody = FindDeep<Text>(tip, "TipBody");
+            }
+
+            EnsureEventPanelTextFonts();
+
+            if (dim != null)
+            {
+                var dimBtn = dim.GetComponent<Button>();
+                if (dimBtn != null)
+                {
+                    dimBtn.onClick.RemoveAllListeners();
+                    dimBtn.enabled = false;
+                }
+            }
+
+            if (!IsUiBindHealthy())
+            {
+                ClearBoundUiRefs();
+                return false;
+            }
+
+            return true;
+        }
+
+        private void ClearBoundUiRefs()
+        {
+            _canvas = null;
+            _dimGroup = null;
+            _sheetRect = null;
+            _sheetGroup = null;
+            _sheetBackground = null;
+            _titleText = null;
+            _descText = null;
+            _descScroll = null;
+            _illustrationImage = null;
+            _illustrationFrame = null;
+            _illustrationColumn = null;
+            _illustrationHint = null;
+            _tooltipRoot = null;
+            _tooltipTitle = null;
+            _tooltipBody = null;
+            _tooltipRect = null;
+            for (int i = 0; i < _options.Length; i++)
+                _options[i] = default;
+            _built = false;
+            _open = false;
+            _animating = false;
+        }
+
+        /// <summary>场景里可能残留多个 EventPanelCanvas，取当前可见、结构完整的那一个。</summary>
+        private Transform FindBestAuthoredCanvasTransform()
+        {
+            Transform best = null;
+            int bestScore = int.MinValue;
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                var child = transform.GetChild(i);
+                if (child.name != CanvasName) continue;
+
+                int score = ScoreAuthoredCanvas(child);
+                if (score <= bestScore) continue;
+                bestScore = score;
+                best = child;
+            }
+
+            return best;
+        }
+
+        private static int ScoreAuthoredCanvas(Transform canvasTf)
+        {
+            int score = canvasTf.GetSiblingIndex();
+            if (canvasTf.gameObject.activeSelf) score += 1000;
+            if (canvasTf.localScale.sqrMagnitude > 0.01f) score += 100;
+
+            var sheet = canvasTf.Find("Sheet");
+            if (sheet == null) return score;
+
+            score += 50;
+            if (FindDeep<Text>(sheet, "Title") != null) score += 20;
+            if (FindDeepTransform(sheet, "IllustrationFrame") != null) score += 10;
+            return score;
+        }
+
+        private void PruneExtraEventPanelCanvases(Transform keep)
+        {
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                var child = transform.GetChild(i);
+                if (child.name != CanvasName || child == keep) continue;
+                DestroyImmediateSafe(child.gameObject, immediate: true);
+            }
+        }
+
+        /// <summary>Editor：删除重复画布，保留当前最佳并应用外框。</summary>
+        public void EditorCleanupDuplicateCanvases()
+        {
+            if (!TryBindAuthored())
+            {
+                Debug.LogWarning("[事件] 未找到可用的 EventPanelCanvas。");
+                return;
+            }
+
+            useAuthoredLayout = true;
+            authoredLayoutVersion = LayoutVersion;
+            _built = true;
+            _builtLayoutVersion = LayoutVersion;
+            ConfigureDescriptionText();
+            WireOptionClicks();
+            NormalizeIllustrationHierarchy();
+            ApplyEventIllustrationFrameArt();
+            LayoutIllustrationPort();
+        }
+
+        private void WireOptionClicks()
+        {
+            for (int i = 0; i < MaxOptions; i++)
+            {
+                var slot = _options[i];
+                if (slot == null || slot.Button == null) continue;
+                int index = i;
+                slot.Button.onClick.RemoveAllListeners();
+                slot.Button.onClick.AddListener(() => OnOptionClicked(index));
+            }
+        }
+
+        private static T FindDeep<T>(Transform root, string name) where T : Component
+        {
+            var tf = FindDeepTransform(root, name);
+            return tf != null ? tf.GetComponent<T>() : null;
+        }
+
+        private static Transform FindDeepTransform(Transform root, string name)
+        {
+            if (root == null) return null;
+            if (root.name == name) return root;
+            for (int i = 0; i < root.childCount; i++)
+            {
+                var hit = FindDeepTransform(root.GetChild(i), name);
+                if (hit != null) return hit;
+            }
+
+            return null;
+        }
+
+        private void TearDownBuiltUi(bool immediate = false)
+        {
+            if (_animCo != null)
+            {
+                StopCoroutine(_animCo);
+                _animCo = null;
+            }
+
+            if (_layoutCo != null)
+            {
+                StopCoroutine(_layoutCo);
+                _layoutCo = null;
+            }
+
+            if (_canvas != null)
+            {
+                if (immediate)
+                    DestroyImmediate(_canvas.gameObject);
+                else
+                    Destroy(_canvas.gameObject);
+            }
+
+            ClearBoundUiRefs();
+            _builtLayoutVersion = 0;
+        }
+
+        private void EnsureSheetFrameSize()
+        {
+            if (_sheetRect == null) return;
+            // Centered near-fullscreen frame (compatible with slide-in Y animation).
+            _sheetRect.anchorMin = new Vector2(0.5f, 0.5f);
+            _sheetRect.anchorMax = new Vector2(0.5f, 0.5f);
+            _sheetRect.pivot = new Vector2(0.5f, 0.5f);
+            _sheetRect.sizeDelta = new Vector2(SheetWidth, SheetHeight);
+        }
+
+        private void ApplyEventPanelArt()
+        {
+            if (_sheetBackground == null) return;
+            var art = GameArtLibrary.Load();
+            if (art == null || art.EventPanelBackground == null) return;
+
+            _sheetBackground.sprite = art.EventPanelBackground;
+            _sheetBackground.color = Color.white;
+            // Must stretch: parchment aspect would otherwise show as a thin strip.
+            _sheetBackground.preserveAspect = false;
+            _sheetBackground.type = Image.Type.Simple;
+            _sheetBackground.raycastTarget = true;
+        }
+
+        private void ApplyEventIllustrationFrameArt()
+        {
+            HideIllustrationFrame();
+        }
+
+        private void HideIllustrationFrame()
+        {
+            if (_illustrationFrame == null) return;
+
+            _illustrationFrame.sprite = null;
+            _illustrationFrame.enabled = false;
+            _illustrationFrame.raycastTarget = false;
+        }
+
+        private void NormalizeIllustrationHierarchy()
+        {
+            if (_sheetRect == null) return;
+
+            _illustrationColumn = FindDeepTransform(_sheetRect, "IllustrationColumn") as RectTransform;
+            if (_illustrationFrame == null)
+                _illustrationFrame = FindDeep<Image>(_sheetRect, "IllustrationFrame");
+            if (_illustrationImage == null)
+                _illustrationImage = FindDeep<Image>(_sheetRect, "Illustration");
+            _illustrationHint = FindDeep<Text>(_sheetRect, "IllustHint");
+
+            if (_illustrationColumn == null) return;
+
+            if (_illustrationFrame != null)
+            {
+                DestroyStraySpriteRendererChildren(_illustrationFrame.transform);
+                if (_illustrationFrame.transform.parent != _illustrationColumn)
+                    _illustrationFrame.transform.SetParent(_illustrationColumn, false);
+                HideIllustrationFrame();
+            }
+
+            if (_illustrationImage != null && _illustrationImage != _illustrationFrame)
+            {
+                if (_illustrationImage.transform.parent != _illustrationColumn)
+                    _illustrationImage.transform.SetParent(_illustrationColumn, false);
+            }
+        }
+
+        private static void DestroyStraySpriteRendererChildren(Transform root)
+        {
+            if (root == null) return;
+            for (int i = root.childCount - 1; i >= 0; i--)
+            {
+                var child = root.GetChild(i);
+                if (child.GetComponent<SpriteRenderer>() != null)
+                    DestroyImmediateSafe(child.gameObject);
+            }
+        }
+
+        private void LayoutIllustrationPort()
+        {
+            if (_illustrationColumn == null) return;
+
+            if (ShouldUseManualIllustrationLayout())
+            {
+                EnsureManualIllustrationUnmasked();
+                ApplyIllustrationLayerOrder();
+                return;
+            }
+
+            if (_illustrationColumn.GetComponent<RectMask2D>() == null)
+                _illustrationColumn.gameObject.AddComponent<RectMask2D>();
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_illustrationColumn);
+
+            float parentW = _illustrationColumn.rect.width;
+            float parentH = _illustrationColumn.rect.height;
+            if (parentW < 1f || parentH < 1f)
+                return;
+
+            float centerX;
+            float centerY;
+            float side;
+            if (EventIllustrationLayoutResolver.TryResolve(
+                    _sheetRect, _illustrationColumn, _canvas, out var authoredCenter, out side))
+            {
+                centerX = authoredCenter.x;
+                centerY = authoredCenter.y;
+            }
+            else
+            {
+                side = Mathf.Max(parentW, parentH);
+                centerX = parentW * 0.5f;
+                centerY = parentH * 0.5f;
+            }
+
+            PlaceIllustrationSquare(_illustrationFrame?.rectTransform, centerX, centerY, side, 0f);
+            PlaceIllustrationSquare(_illustrationImage?.rectTransform, centerX, centerY, side, IllustrationArtInset);
+            ApplyIllustrationLayerOrder();
+        }
+
+        /// <summary>
+        /// 手调外框常大于 IllustrationColumn（约 48% 宽），RectMask2D 会裁成左侧细条。
+        /// 关卡间与玩法均需关闭裁剪，外框才能铺满羊皮区域。
+        /// </summary>
+        private void EnsureManualIllustrationUnmasked()
+        {
+            if (_illustrationColumn == null)
+                return;
+
+            var mask = _illustrationColumn.GetComponent<RectMask2D>();
+            if (mask == null)
+                return;
+
+            if (Application.isPlaying)
+                Destroy(mask);
+            else
+                DestroyImmediate(mask);
+        }
+
+        private bool ShouldUseManualIllustrationLayout()
+        {
+            return manualIllustrationLayout
+                && useAuthoredLayout
+                && HasValidAuthoredIllustrationLayout();
+        }
+
+        private bool HasValidAuthoredIllustrationLayout()
+        {
+            if (_illustrationFrame == null)
+                return false;
+
+            var size = _illustrationFrame.rectTransform.sizeDelta;
+            return size.x >= MinAuthoredIllustrationSide && size.y >= MinAuthoredIllustrationSide;
+        }
+
+        private static void PlaceIllustrationSquare(
+            RectTransform rect,
+            float centerX,
+            float centerY,
+            float side,
+            float inset)
+        {
+            if (rect == null) return;
+            float s = Mathf.Max(8f, side - inset * 2f);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.zero;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(centerX, centerY);
+            rect.sizeDelta = new Vector2(s, s);
+        }
+
+        private void ApplyEventIllustration(EventItem item)
+        {
+            if (_illustrationImage == null) return;
+
+            var sprite = EventIllustrationLibrary.Load()?.Resolve(item?.Id, item?.DisplayName);
+            bool hasArt = sprite != null;
+            if (hasArt)
+            {
+                _illustrationImage.sprite = sprite;
+                _illustrationImage.color = Color.white;
+                _illustrationImage.preserveAspect = false;
+                _illustrationImage.type = Image.Type.Simple;
+            }
+            else
+            {
+                _illustrationImage.sprite = GameOverlayUI.SharedUiSprite();
+                _illustrationImage.color = new Color(0.12f, 0.14f, 0.18f, 0.95f);
+                _illustrationImage.preserveAspect = false;
+                _illustrationImage.type = Image.Type.Simple;
+            }
+
+            _illustrationImage.raycastTarget = false;
+            if (_illustrationHint != null)
+                _illustrationHint.gameObject.SetActive(!hasArt);
+
+            if (!ShouldUseManualIllustrationLayout())
+                EnsureIllustrationImageFitsFrame();
+        }
+
+        /// <summary>自动布局时保证插画 Rect 与外框一致（避免链式弹事件时插画缩成精灵原尺寸）。</summary>
+        private void EnsureIllustrationImageFitsFrame()
+        {
+            if (_illustrationFrame == null || _illustrationImage == null)
+                return;
+
+            var frameRt = _illustrationFrame.rectTransform;
+            var imageRt = _illustrationImage.rectTransform;
+            if (frameRt.sizeDelta.x < MinAuthoredIllustrationSide || frameRt.sizeDelta.y < MinAuthoredIllustrationSide)
+                return;
+
+            float side = Mathf.Max(frameRt.sizeDelta.x, frameRt.sizeDelta.y);
+            PlaceIllustrationSquare(
+                imageRt,
+                frameRt.anchoredPosition.x,
+                frameRt.anchoredPosition.y,
+                side,
+                IllustrationArtInset);
+        }
+
+        /// <summary>插画列置于文字列之上。</summary>
+        private void ApplyIllustrationLayerOrder()
+        {
+            if (_illustrationColumn != null && _illustrationColumn.parent != null)
+                _illustrationColumn.SetAsLastSibling();
+
+            if (_illustrationImage != null)
+                _illustrationImage.transform.SetAsLastSibling();
+
+            if (_illustrationHint != null)
+                _illustrationHint.transform.SetAsLastSibling();
+        }
+
+        private void ApplyOptionsPresentation()
+        {
+            if (useAuthoredLayout)
+                return;
+
+            RectTransform optionsRect = null;
+            for (int i = 0; i < MaxOptions; i++)
+            {
+                var slot = _options[i];
+                if (slot?.Root == null) continue;
+                optionsRect = slot.Root.transform.parent as RectTransform;
+                break;
+            }
+
+            if (optionsRect != null)
+            {
+                optionsRect.anchorMin = new Vector2(OptionAnchorInsetX, 0.02f);
+                optionsRect.anchorMax = new Vector2(1f - OptionAnchorInsetX, 0.56f);
+                optionsRect.offsetMin = Vector2.zero;
+                optionsRect.offsetMax = Vector2.zero;
+
+                var layout = optionsRect.GetComponent<VerticalLayoutGroup>();
+                if (layout != null)
+                {
+                    layout.spacing = 20f;
+                    layout.childAlignment = TextAnchor.UpperCenter;
+                    layout.padding = new RectOffset(8, 8, 8, 8);
+                }
+            }
+
+            if (_descScroll != null && _descScroll.viewport != null)
+            {
+                var viewportRect = _descScroll.viewport;
+                viewportRect.anchorMin = new Vector2(0f, 0.58f);
+                viewportRect.anchorMax = new Vector2(1f, 1f);
+                viewportRect.offsetMin = new Vector2(4f, 4f);
+                viewportRect.offsetMax = new Vector2(-4f, -8f);
+            }
+
+            var fitted = GameOverlayUI.FitArtButtonSize(OptionPreferredWidth, OptionMinHeight + 4f);
+            for (int i = 0; i < MaxOptions; i++)
+            {
+                var slot = _options[i];
+                if (slot?.Root == null) continue;
+
+                var le = slot.Root.GetComponent<LayoutElement>();
+                if (le == null)
+                    le = slot.Root.AddComponent<LayoutElement>();
+                le.minHeight = OptionMinHeight;
+                le.preferredHeight = fitted.y;
+                le.preferredWidth = OptionPreferredWidth;
+                le.flexibleWidth = 0f;
+
+                if (slot.Label != null)
+                {
+                    slot.Label.fontSize = Mathf.RoundToInt(OptionFontSize);
+                    var labelRect = slot.Label.rectTransform;
+                    labelRect.offsetMin = new Vector2(18f, 8f);
+                    labelRect.offsetMax = new Vector2(-18f, -8f);
+                }
+            }
         }
 
         private void Build()
@@ -516,7 +1491,7 @@ namespace Soup.Game
                 es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
             }
 
-            var canvasGo = new GameObject("EventPanelCanvas");
+            var canvasGo = new GameObject(CanvasName);
             canvasGo.transform.SetParent(transform, false);
             _canvas = canvasGo.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -537,91 +1512,125 @@ namespace Soup.Game
             dimImage.raycastTarget = true;
             _dimGroup = dimGo.AddComponent<CanvasGroup>();
             _dimGroup.alpha = 0f;
-            var dimBtn = dimGo.AddComponent<Button>();
-            dimBtn.transition = Selectable.Transition.None;
-            dimBtn.onClick.AddListener(OnDimClicked);
 
             var sheetGo = new GameObject("Sheet");
             sheetGo.transform.SetParent(canvasGo.transform, false);
             _sheetRect = sheetGo.AddComponent<RectTransform>();
-            _sheetRect.anchorMin = new Vector2(0.5f, 0.5f);
-            _sheetRect.anchorMax = new Vector2(0.5f, 0.5f);
-            _sheetRect.pivot = new Vector2(0.5f, 0.5f);
-            _sheetRect.sizeDelta = new Vector2(1280f, 720f);
+            EnsureSheetFrameSize();
             _sheetRect.anchoredPosition = new Vector2(0f, HiddenY);
-            var sheetImage = sheetGo.AddComponent<Image>();
-            sheetImage.sprite = GameOverlayUI.SharedUiSprite();
-            sheetImage.color = new Color(0.11f, 0.13f, 0.18f, 0.98f);
-            sheetImage.raycastTarget = true;
+            _sheetBackground = sheetGo.AddComponent<Image>();
+            _sheetBackground.sprite = GameOverlayUI.SharedUiSprite();
+            _sheetBackground.color = Color.white;
+            _sheetBackground.preserveAspect = false;
+            _sheetBackground.type = Image.Type.Simple;
+            _sheetBackground.raycastTarget = true;
             _sheetGroup = sheetGo.AddComponent<CanvasGroup>();
 
+            // Title sits below measured parchment rim (~166px writing start).
             _titleText = CreateText(sheetGo.transform, "Title",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -36f), new Vector2(1100f, 52f),
-                36, FontStyle.Bold, TextAnchor.MiddleCenter);
+                new Vector2(0f, -(ParchmentTopSafe - 30f)), new Vector2(1100f, 40f),
+                28, FontStyle.Bold, TextAnchor.MiddleCenter);
+            _titleText.color = new Color(0.22f, 0.14f, 0.08f, 1f);
 
             var body = new GameObject("Body");
             body.transform.SetParent(sheetGo.transform, false);
             var bodyRect = body.AddComponent<RectTransform>();
             bodyRect.anchorMin = new Vector2(0f, 0f);
             bodyRect.anchorMax = new Vector2(1f, 1f);
-            bodyRect.offsetMin = new Vector2(36f, 36f);
-            bodyRect.offsetMax = new Vector2(-36f, -100f);
+            // Left/right past side rim; top clears title + rim so description is not covered.
+            bodyRect.offsetMin = new Vector2(480f, ParchmentBottomSafe);
+            bodyRect.offsetMax = new Vector2(-320f, -(ParchmentTopSafe + 36f));
+
+            var illustColumnGo = new GameObject("IllustrationColumn");
+            illustColumnGo.transform.SetParent(body.transform, false);
+            _illustrationColumn = illustColumnGo.AddComponent<RectTransform>();
+            _illustrationColumn.anchorMin = new Vector2(0f, 0f);
+            _illustrationColumn.anchorMax = new Vector2(IllustrationColumnMaxX, 1f);
+            _illustrationColumn.offsetMin = Vector2.zero;
+            _illustrationColumn.offsetMax = Vector2.zero;
 
             var illust = new GameObject("Illustration");
-            illust.transform.SetParent(body.transform, false);
-            var illustRect = illust.AddComponent<RectTransform>();
-            illustRect.anchorMin = new Vector2(0f, 0f);
-            illustRect.anchorMax = new Vector2(0.42f, 1f);
-            illustRect.offsetMin = Vector2.zero;
-            illustRect.offsetMax = new Vector2(-12f, 0f);
+            illust.transform.SetParent(illustColumnGo.transform, false);
+            illust.AddComponent<RectTransform>();
             _illustrationImage = illust.AddComponent<Image>();
-            _illustrationImage.sprite = GameOverlayUI.SharedUiSprite();
-            _illustrationImage.color = new Color(0.18f, 0.22f, 0.28f, 1f);
             _illustrationHint = CreateText(illust.transform, "IllustHint",
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(280f, 80f),
-                24, FontStyle.Normal, TextAnchor.MiddleCenter);
-            _illustrationHint.color = new Color(1f, 1f, 1f, 0.35f);
+                Vector2.zero, new Vector2(240f, 72f),
+                22, FontStyle.Normal, TextAnchor.MiddleCenter);
             _illustrationHint.text = "插画（待定）";
+
+            var frameGo = new GameObject("IllustrationFrame");
+            frameGo.transform.SetParent(illustColumnGo.transform, false);
+            frameGo.AddComponent<RectTransform>();
+            _illustrationFrame = frameGo.AddComponent<Image>();
+            HideIllustrationFrame();
 
             var right = new GameObject("Right");
             right.transform.SetParent(body.transform, false);
             var rightRect = right.AddComponent<RectTransform>();
-            rightRect.anchorMin = new Vector2(0.42f, 0f);
+            rightRect.anchorMin = new Vector2(RightColumnMinX, 0f);
             rightRect.anchorMax = new Vector2(1f, 1f);
             rightRect.offsetMin = new Vector2(12f, 0f);
             rightRect.offsetMax = Vector2.zero;
 
-            _descText = CreateText(right.transform, "Description",
+            illustColumnGo.transform.SetAsLastSibling();
+
+            // 描述区：字号×2，自动换行；视口内滚动，绝不画出羊皮框。
+            var descViewport = new GameObject("DescViewport");
+            descViewport.transform.SetParent(right.transform, false);
+            var viewportRect = descViewport.AddComponent<RectTransform>();
+            viewportRect.anchorMin = new Vector2(0f, 0.58f);
+            viewportRect.anchorMax = new Vector2(1f, 1f);
+            viewportRect.offsetMin = new Vector2(4f, 4f);
+            viewportRect.offsetMax = new Vector2(-4f, -8f);
+            var viewportBg = descViewport.AddComponent<Image>();
+            viewportBg.color = new Color(1f, 1f, 1f, 0.01f);
+            viewportBg.raycastTarget = true;
+            descViewport.AddComponent<RectMask2D>();
+
+            _descText = CreateText(descViewport.transform, "Description",
                 new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, 0f), new Vector2(0f, 180f),
-                22, FontStyle.Normal, TextAnchor.UpperLeft);
+                Vector2.zero, new Vector2(0f, 40f),
+                36, FontStyle.Normal, TextAnchor.UpperLeft);
             var descRect = _descText.GetComponent<RectTransform>();
             descRect.anchorMin = new Vector2(0f, 1f);
             descRect.anchorMax = new Vector2(1f, 1f);
             descRect.pivot = new Vector2(0.5f, 1f);
             descRect.anchoredPosition = Vector2.zero;
-            descRect.sizeDelta = new Vector2(0f, 180f);
-            _descText.color = new Color(0.88f, 0.90f, 0.94f, 1f);
-            _descText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _descText.verticalOverflow = VerticalWrapMode.Overflow;
+            // sizeDelta.x 为负：换行宽度比视口少约一字。
+            descRect.sizeDelta = new Vector2(-DescWrapOneCharInset, 40f);
+            _descText.color = new Color(0.28f, 0.18f, 0.10f, 1f);
+            ConfigureDescriptionText(_descText);
+            var descFitter = _descText.gameObject.AddComponent<ContentSizeFitter>();
+            descFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            descFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            _descScroll = descViewport.AddComponent<ScrollRect>();
+            _descScroll.content = descRect;
+            _descScroll.viewport = viewportRect;
+            _descScroll.horizontal = false;
+            _descScroll.vertical = true;
+            _descScroll.movementType = ScrollRect.MovementType.Clamped;
+            _descScroll.scrollSensitivity = 28f;
+            _descScroll.inertia = true;
 
             var optionsRoot = new GameObject("Options");
             optionsRoot.transform.SetParent(right.transform, false);
             var optionsRect = optionsRoot.AddComponent<RectTransform>();
-            optionsRect.anchorMin = new Vector2(0f, 0f);
-            optionsRect.anchorMax = new Vector2(1f, 1f);
+            // 选项排在介绍文字正下方，居中略收窄。
+            optionsRect.anchorMin = new Vector2(OptionAnchorInsetX, 0.02f);
+            optionsRect.anchorMax = new Vector2(1f - OptionAnchorInsetX, 0.56f);
             optionsRect.offsetMin = Vector2.zero;
-            optionsRect.offsetMax = new Vector2(0f, -196f);
+            optionsRect.offsetMax = Vector2.zero;
             var layout = optionsRoot.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 12f;
+            layout.spacing = 20f;
             layout.childAlignment = TextAnchor.UpperCenter;
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
             layout.childForceExpandWidth = true;
-            layout.padding = new RectOffset(0, 0, 0, 0);
+            layout.padding = new RectOffset(8, 8, 8, 8);
 
             for (int i = 0; i < MaxOptions; i++)
             {
@@ -638,9 +1647,11 @@ namespace Soup.Game
             var go = new GameObject($"Option{index}");
             go.transform.SetParent(parent, false);
             var le = go.AddComponent<LayoutElement>();
-            le.minHeight = 72f;
-            var fitted = GameOverlayUI.FitArtButtonSize(600f, 78f);
+            le.minHeight = OptionMinHeight;
+            var fitted = GameOverlayUI.FitArtButtonSize(OptionPreferredWidth, OptionMinHeight + 4f);
             le.preferredHeight = fitted.y;
+            le.preferredWidth = OptionPreferredWidth;
+            le.flexibleWidth = 0f;
 
             var image = go.AddComponent<Image>();
             var button = go.AddComponent<Button>();
@@ -655,7 +1666,7 @@ namespace Soup.Game
             labelRect.offsetMax = new Vector2(-18f, -8f);
             var label = labelGo.AddComponent<Text>();
             label.font = GameOverlayUI.SharedUiFont();
-            label.fontSize = 20;
+            label.fontSize = Mathf.RoundToInt(OptionFontSize);
             label.alignment = TextAnchor.MiddleLeft;
             label.color = Color.white;
             label.supportRichText = true;
@@ -710,6 +1721,22 @@ namespace Soup.Game
             tip.SetActive(false);
         }
 
+        private void EnsureEventPanelTextFonts()
+        {
+            DisableLegacyTooltip();
+            var font = GameOverlayUI.SharedUiFont();
+            if (font == null) return;
+
+            for (int i = 0; i < MaxOptions; i++)
+            {
+                var label = _options[i]?.Label;
+                if (label == null) continue;
+                if (!SafeUiFont.IsUsable(label.font) || label.font.name == "Arial")
+                    label.font = font;
+                label.supportRichText = true;
+            }
+        }
+
         private static Text CreateLayoutText(Transform parent, string name, int size, FontStyle style)
         {
             var go = new GameObject(name);
@@ -722,10 +1749,51 @@ namespace Soup.Game
             text.fontStyle = style;
             text.alignment = TextAnchor.UpperLeft;
             text.color = Color.white;
+            text.supportRichText = false;
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Overflow;
             text.raycastTarget = false;
             return text;
+        }
+
+        private void ConfigureDescriptionText() => ConfigureDescriptionText(_descText);
+
+        private static void ConfigureDescriptionText(Text text)
+        {
+            if (text == null) return;
+            text.fontSize = 36;
+            text.alignment = TextAnchor.UpperLeft;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            // PreferredHeight 需要 Vertical Overflow；视觉裁剪由 Mask/ScrollRect 负责。
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.resizeTextForBestFit = false;
+            text.raycastTarget = false;
+        }
+
+        private void RefreshDescriptionLayout()
+        {
+            if (_descText == null) return;
+            ConfigureDescriptionText(_descText);
+            Canvas.ForceUpdateCanvases();
+            var rect = _descText.rectTransform;
+            float parentWidth = rect.rect.width + DescWrapOneCharInset;
+            if (parentWidth < 1f && rect.parent is RectTransform parent)
+                parentWidth = parent.rect.width;
+            float wrapWidth = Mathf.Max(1f, parentWidth - DescWrapOneCharInset);
+            float height = _descText.preferredHeight;
+            if (wrapWidth > 1f)
+            {
+                var settings = _descText.GetGenerationSettings(new Vector2(wrapWidth, 0f));
+                height = _descText.cachedTextGeneratorForLayout.GetPreferredHeight(_descText.text, settings)
+                    / _descText.pixelsPerUnit;
+            }
+
+            rect.sizeDelta = new Vector2(-DescWrapOneCharInset, Mathf.Max(40f, height + 4f));
+            if (_descScroll != null)
+            {
+                _descScroll.verticalNormalizedPosition = 1f;
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_descScroll.viewport);
+            }
         }
 
         private static Text CreateText(

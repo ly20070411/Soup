@@ -34,46 +34,52 @@ namespace Soup.Levels.Editor
                 db,
                 "stage_1",
                 "第一关",
-                "在限定回合内攒够分数，完成第一关。",
+                "10 回合内达到 5000 分即可通关。",
                 orderIndex: 1,
-                targetScore: 30,
-                maxTurns: 10);
+                targetScore: 5000,
+                maxTurns: 10,
+                challengeScore: 6000);
 
             CreateOrUpdate(
                 db,
                 "stage_2",
                 "第二关",
-                "目标更高，回合略增。注意仓库与岗位搭配。",
+                "10 回合内达到 10000 分即可通关。",
                 orderIndex: 2,
-                targetScore: 80,
-                maxTurns: 12);
+                targetScore: 10000,
+                maxTurns: 10,
+                challengeScore: 12000);
 
             CreateOrUpdate(
                 db,
                 "stage_3",
                 "第三关",
-                "冲刺更高分数。回合用尽时酸涩会结算并计入达标判定。",
+                "10 回合内达到 17000 分即可通关。回合用尽时酸涩会结算并计入达标判定。",
                 orderIndex: 3,
-                targetScore: 150,
-                maxTurns: 15);
+                targetScore: 17000,
+                maxTurns: 10,
+                challengeScore: 20000);
 
             CreateOrUpdate(
                 db,
                 "stage_4",
                 "第四关",
-                "难度继续提升，为最终关做准备。",
+                "10 回合内达到 30000 分即可通关。",
                 orderIndex: 4,
-                targetScore: 250,
-                maxTurns: 18);
+                targetScore: 30000,
+                maxTurns: 10,
+                challengeScore: 35000);
 
             CreateOrUpdate(
                 db,
                 "stage_5",
                 "第五关",
-                "最终关。通关后宣布游戏胜利。",
+                "10 回合内达到 42000 分即可通关。通关后宣布游戏胜利。",
                 orderIndex: 5,
-                targetScore: 350,
-                maxTurns: 20);
+                targetScore: 42000,
+                maxTurns: 10,
+                challengeScore: 50000,
+                ultimateChallengeScore: 60000);
 
             EditorUtility.SetDirty(db);
             AssetDatabase.SaveAssets();
@@ -93,7 +99,9 @@ namespace Soup.Levels.Editor
             string description,
             int orderIndex,
             int targetScore,
-            int maxTurns)
+            int maxTurns,
+            int challengeScore = 0,
+            int ultimateChallengeScore = 0)
         {
             string path = $"{LevelFolder}/Level_{id}.asset";
             var item = AssetDatabase.LoadAssetAtPath<LevelItem>(path);
@@ -106,7 +114,7 @@ namespace Soup.Levels.Editor
             item.SetIdentity(id, displayName);
             item.SetDescription(description);
             item.SetOrderIndex(orderIndex);
-            item.SetVictory(targetScore, maxTurns);
+            item.SetVictory(targetScore, maxTurns, challengeScore, ultimateChallengeScore);
             EditorUtility.SetDirty(item);
             db.Add(item);
         }

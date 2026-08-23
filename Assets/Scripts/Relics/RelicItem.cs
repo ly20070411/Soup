@@ -68,17 +68,55 @@ namespace Soup.Relics
             rules.Add(rule);
         }
 
-        public string GetRulesSummary()
+        public string GetRulesSummary(int stacks = 1)
         {
             if (rules == null || rules.Count == 0)
                 return "无规则";
 
+            stacks = Mathf.Max(1, stacks);
             var sb = new StringBuilder();
             for (int i = 0; i < rules.Count; i++)
             {
                 if (rules[i] == null) continue;
                 if (sb.Length > 0) sb.Append('\n');
-                sb.Append(rules[i].ToSummary());
+                sb.Append(rules[i].ToSummary(stacks));
+            }
+
+            return sb.Length > 0 ? sb.ToString() : "无规则";
+        }
+
+        /// <summary>
+        /// HUD/tooltip effect text. Single copy prefers authored description;
+        /// stacks show total bonus from rules (matches runtime stacking).
+        /// </summary>
+        public string GetEffectDisplayText(int stacks = 1)
+        {
+            stacks = Mathf.Max(1, stacks);
+            if (stacks <= 1)
+            {
+                if (!string.IsNullOrWhiteSpace(description))
+                    return description.Trim();
+                return GetEffectOnlySummary(1);
+            }
+
+            string totals = GetEffectOnlySummary(stacks);
+            return !string.IsNullOrWhiteSpace(totals) && totals != "无规则"
+                ? totals
+                : (description ?? string.Empty).Trim();
+        }
+
+        public string GetEffectOnlySummary(int stacks = 1)
+        {
+            if (rules == null || rules.Count == 0)
+                return "无规则";
+
+            stacks = Mathf.Max(1, stacks);
+            var sb = new StringBuilder();
+            for (int i = 0; i < rules.Count; i++)
+            {
+                if (rules[i] == null) continue;
+                if (sb.Length > 0) sb.Append('\n');
+                sb.Append(rules[i].EffectSummary(stacks));
             }
 
             return sb.Length > 0 ? sb.ToString() : "无规则";

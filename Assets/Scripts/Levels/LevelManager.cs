@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Soup.Events;
 using Soup.Game;
+using Soup.Relics;
 using UnityEngine;
 
 namespace Soup.Levels
@@ -27,11 +28,10 @@ namespace Soup.Levels
         private int _levelsClearedCount;
         /// <summary>本关结算时的最终得分（清零 TurnManager 分后仍供关卡间/失败页显示）。</summary>
         private int _lastFinishedScore;
+        private readonly List<bool> _levelChallengeReachedFlags = new List<bool>();
         private LevelOutcome _outcome = LevelOutcome.InProgress;
         /// <summary>Won this level; 关卡间奖励领取中。</summary>
         private bool _awaitingClearSequence;
-        /// <summary>回合用尽后正在自动结算酸涩，尚未判胜负。</summary>
-        private bool _autoSettling;
         /// <summary>当前已订阅事件的 TurnManager（Instance 晚创建或被重建时需重绑）。</summary>
         private TurnManager _boundTurns;
 
@@ -69,8 +69,7 @@ namespace Soup.Levels
             !HasLevels
             || (_current != null
                 && _outcome == LevelOutcome.InProgress
-                && !_awaitingClearSequence
-                && !_autoSettling);
+                && !_awaitingClearSequence);
 
         /// <summary>无关卡时仍可用手动结算；有关卡时通关自动处理。</summary>
         public bool CanSettleAndAdvance => !HasLevels;
@@ -78,9 +77,11 @@ namespace Soup.Levels
         public bool UsesAutoSettle => HasLevels;
 
         public int TargetScore => _current != null ? _current.TargetScore : 0;
+        public int ChallengeScore => _current != null ? _current.ChallengeScore : 0;
+        public bool HasChallengeScore => ChallengeScore > 0;
         public int MaxTurns => _current != null ? _current.MaxTurns : 0;
 
-        /// <summary>本关开始后的得分增量（含第 MaxTurns 回合结束后的酸涩结算分）。</summary>
+        /// <summary>本关开始后的得分增量（酸涩、热辣在关底结算时计入）。</summary>
         public int ScoreGainedInLevel
         {
             get
@@ -104,6 +105,37 @@ namespace Soup.Levels
 
         public int ScoreRemaining =>
             _current == null ? 0 : Mathf.Max(0, _current.TargetScore - ScoreGainedInLevel);
+
+        public bool ChallengeScoreReached =>
+            HasChallengeScore && ScoreGainedInLevel >= ChallengeScore;
+
+        public int UltimateChallengeScore =>
+            _current != null ? _current.UltimateChallengeScore : 0;
+
+        public bool HasUltimateChallengeScore => UltimateChallengeScore > 0;
+
+        public bool UltimateChallengeScoreReached =>
+            HasUltimateChallengeScore && ScoreGainedInLevel >= UltimateChallengeScore;
+
+        /// <summary>五关均已通关，且每一关有挑战分的关卡都达到了挑战分。</summary>
+        public bool AllClearedLevelsReachedChallenge()
+        {
+            var ordered = database != null ? database.GetOrdered() : null;
+            if (ordered == null || ordered.Count == 0)
+                return false;
+            if (_levelsClearedCount < ordered.Count)
+                return false;
+
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                if (ordered[i].ChallengeScore <= 0)
+                    continue;
+                if (i >= _levelChallengeReachedFlags.Count || !_levelChallengeReachedFlags[i])
+                    return false;
+            }
+
+            return true;
+        }
 
         public event Action<LevelItem> LevelStarted;
         public event Action<LevelItem> LevelWon;
@@ -251,8 +283,8 @@ namespace Soup.Levels
             _levelStartScore = 0;
             _levelsClearedCount = 0;
             _lastFinishedScore = 0;
+            _levelChallengeReachedFlags.Clear();
             _awaitingClearSequence = false;
-            _autoSettling = false;
             _rewards.Clear();
 
             var ordered = database != null ? database.GetOrdered() : null;
@@ -308,12 +340,18 @@ namespace Soup.Levels
             out bool rewardElvesClaimed,
             out bool rewardWarehouseClaimed,
             out bool rewardRelicClaimed,
+            out bool rewardShopClaimed,
             out bool rewardAdvanceClaimed,
             out bool rewardEventsClaimed,
+            out bool rewardStandardStageEventsStarted,
             out int rewardGatherCharges,
             out int rewardProcessCharges,
             out int rewardCookCharges,
-            List<string> rewardRelicOfferIds)
+            List<string> rewardRelicOfferIds,
+            List<string> rewardShopOfferIds,
+            List<string> rewardGatherUnlockOfferIds,
+            List<string> rewardProcessUnlockOfferIds,
+            List<bool> levelChallengeReachedFlags)
         {
             levelId = _current != null ? _current.Id : string.Empty;
             levelListIndex = _levelListIndex;
@@ -324,30 +362,47 @@ namespace Soup.Levels
             awaitingSettle = _awaitingClearSequence;
             levelsClearedCount = _levelsClearedCount;
 
+            levelChallengeReachedFlags?.Clear();
+            if (levelChallengeReachedFlags != null)
+            {
+                for (int i = 0; i < _levelChallengeReachedFlags.Count; i++)
+                    levelChallengeReachedFlags.Add(_levelChallengeReachedFlags[i]);
+            }
+
             if (_awaitingClearSequence && _rewards.IsActive)
             {
                 _rewards.Capture(
                     out rewardElvesClaimed,
                     out rewardWarehouseClaimed,
                     out rewardRelicClaimed,
+                    out rewardShopClaimed,
                     out rewardAdvanceClaimed,
                     out rewardEventsClaimed,
+                    out rewardStandardStageEventsStarted,
                     out rewardGatherCharges,
                     out rewardProcessCharges,
                     out rewardCookCharges,
-                    rewardRelicOfferIds);
+                    rewardRelicOfferIds,
+                    rewardShopOfferIds,
+                    rewardGatherUnlockOfferIds,
+                    rewardProcessUnlockOfferIds);
             }
             else
             {
                 rewardElvesClaimed = false;
                 rewardWarehouseClaimed = false;
                 rewardRelicClaimed = false;
+                rewardShopClaimed = false;
                 rewardAdvanceClaimed = false;
                 rewardEventsClaimed = false;
+                rewardStandardStageEventsStarted = false;
                 rewardGatherCharges = 0;
                 rewardProcessCharges = 0;
                 rewardCookCharges = 0;
                 rewardRelicOfferIds?.Clear();
+                rewardShopOfferIds?.Clear();
+                rewardGatherUnlockOfferIds?.Clear();
+                rewardProcessUnlockOfferIds?.Clear();
             }
         }
 
@@ -362,13 +417,19 @@ namespace Soup.Levels
             bool rewardElvesClaimed = false,
             bool rewardWarehouseClaimed = false,
             bool rewardRelicClaimed = false,
+            bool rewardShopClaimed = false,
             bool rewardAdvanceClaimed = false,
             bool rewardEventsClaimed = false,
+            bool rewardStandardStageEventsStarted = false,
             int rewardGatherCharges = 0,
             int rewardProcessCharges = 0,
             int rewardCookCharges = 0,
             IList<string> rewardRelicOfferIds = null,
-            int levelFinishedScore = 0)
+            IList<string> rewardShopOfferIds = null,
+            IList<string> rewardGatherUnlockOfferIds = null,
+            IList<string> rewardProcessUnlockOfferIds = null,
+            int levelFinishedScore = 0,
+            IList<bool> levelChallengeReachedFlags = null)
         {
             database?.RebuildIndex();
             // 每关独立计分：存档中的 levelStartScore 忽略，本关得分即 TurnManager.Score。
@@ -376,9 +437,14 @@ namespace Soup.Levels
             _levelStartScore = 0;
             _lastFinishedScore = Mathf.Max(0, levelFinishedScore);
             _levelsClearedCount = Mathf.Max(0, levelsClearedCount);
+            _levelChallengeReachedFlags.Clear();
+            if (levelChallengeReachedFlags != null)
+            {
+                for (int i = 0; i < levelChallengeReachedFlags.Count; i++)
+                    _levelChallengeReachedFlags.Add(levelChallengeReachedFlags[i]);
+            }
             _outcome = outcome;
             _awaitingClearSequence = awaitingSettle && outcome == LevelOutcome.Won;
-            _autoSettling = false;
             _rewards.Clear();
 
             // 当前回合号从 1 起。旧存档若存 0（未开始），升为 1。
@@ -418,12 +484,17 @@ namespace Soup.Levels
                     rewardElvesClaimed,
                     rewardWarehouseClaimed,
                     rewardRelicClaimed,
+                    rewardShopClaimed,
                     rewardAdvanceClaimed,
                     rewardEventsClaimed,
+                    rewardStandardStageEventsStarted,
                     rewardGatherCharges,
                     rewardProcessCharges,
                     rewardCookCharges,
-                    rewardRelicOfferIds);
+                    rewardRelicOfferIds,
+                    rewardShopOfferIds,
+                    rewardGatherUnlockOfferIds,
+                    rewardProcessUnlockOfferIds);
                 return;
             }
 
@@ -449,11 +520,15 @@ namespace Soup.Levels
             _rewards.Clear();
 
             // 每一关独立：进入新关时分数 / 食材 / 风味清零。
+            // 事件已触发记录保留在 EventManager，跨五关累计去重。
             var turns = TurnManager.Instance;
             turns?.ResetLevelScore();
             _levelStartScore = 0;
             _lastFinishedScore = 0;
             RecallEmployeesToStandby();
+
+            // 库存已清：此时检测遗物并发放关卡补给（如炖煮吱吱 +3000）。
+            RelicManager.Instance?.ApplyLevelEnterRelicEffects();
 
             LevelStarted?.Invoke(_current);
             RaiseChanged();
@@ -465,11 +540,10 @@ namespace Soup.Levels
             if (_outcome != LevelOutcome.InProgress) return;
 
             // 当前回合号刚被「下一回合」结算完毕。
-            // 若已是最后一回合：先酸涩结算再判胜负；否则进入下一回合号。
             if (_levelTurnIndex >= _current.MaxTurns)
             {
                 RaiseChanged();
-                BeginEndOfLevelSourSettle();
+                Evaluate(silent: false);
                 return;
             }
 
@@ -477,24 +551,9 @@ namespace Soup.Levels
             RaiseChanged();
         }
 
-        private void OnStageSettled(StageSettlementResult result)
+        private void OnStageSettled(StageSettlementResult _)
         {
             if (!HasLevels || _current == null) return;
-
-            if (_autoSettling)
-            {
-                _autoSettling = false;
-                Evaluate(silent: false);
-                RaiseChanged();
-                return;
-            }
-
-            if (_outcome == LevelOutcome.InProgress
-                && _levelTurnIndex >= _current.MaxTurns)
-            {
-                Evaluate(silent: false);
-            }
-
             RaiseChanged();
         }
 
@@ -517,45 +576,8 @@ namespace Soup.Levels
             RaiseChanged();
         }
 
-        /// <summary>第 MaxTurns 回合结束后结算酸涩（再判胜负）。</summary>
-        private void BeginEndOfLevelSourSettle()
-        {
-            if (_awaitingClearSequence) return;
-            if (_outcome != LevelOutcome.InProgress) return;
-            if (_autoSettling) return;
-
-            var turns = TurnManager.Instance;
-            if (turns == null)
-            {
-                Evaluate(silent: false);
-                return;
-            }
-
-            _autoSettling = true;
-            try
-            {
-                turns.SettleStage();
-            }
-            catch (Exception ex)
-            {
-                Debug.LogException(ex);
-            }
-            finally
-            {
-                // StageSettled 可能已处理；若未订阅/异常导致未清旗，在此兜底，防止卡死。
-                if (_autoSettling)
-                {
-                    _autoSettling = false;
-                    if (_outcome == LevelOutcome.InProgress)
-                        Evaluate(silent: false);
-                }
-
-                RaiseChanged();
-            }
-        }
-
         /// <summary>
-        /// 在酸涩已结算（或无需结算）后判定：得分 ≥ 目标则通关并进入关卡间。
+        /// 在最后一回合结束后判定：得分 ≥ 目标则通关并进入关卡间。
         /// </summary>
         private void Evaluate(bool silent)
         {
@@ -565,12 +587,20 @@ namespace Soup.Levels
             if (_levelTurnIndex < _current.MaxTurns)
                 return;
 
+            TurnManager.Instance?.TrySettleSourAtStageEnd(out _);
+            TurnManager.Instance?.TrySettleSpicyAtLevelEnd(out _);
+
             int gained = ScoreGainedInLevel;
             _lastFinishedScore = gained;
+
+            // 胜负已定：先跑关卡结束遗物（升华等），再清分/召回。
+            RelicManager.Instance?.ApplyLevelEndRelicEffects();
+
             if (gained >= _current.TargetScore)
             {
                 _outcome = LevelOutcome.Won;
                 _awaitingClearSequence = true;
+                RecordCurrentLevelChallengeResult();
                 // 关结束：分数、食材、风味立即清零（展示分走 _lastFinishedScore）。
                 TurnManager.Instance?.ResetLevelScore();
                 RecallEmployeesToStandby();
@@ -589,7 +619,7 @@ namespace Soup.Levels
             if (!silent)
             {
                 LevelLost?.Invoke(_current);
-                GameSessionLaunch.GoToInterLevel();
+                GameSessionLaunch.DeclareLevelDefeat();
             }
         }
 
@@ -606,9 +636,75 @@ namespace Soup.Levels
             _lastFinishedScore = turns != null ? Mathf.Max(0, turns.Score - _levelStartScore) : 0;
             _outcome = LevelOutcome.Won;
             _awaitingClearSequence = true;
+            RecordCurrentLevelChallengeResult();
             turns?.ResetLevelScore();
             RecallEmployeesToStandby();
             BeginLevelClearSequence(restoreRewards: false);
+        }
+
+        /// <summary>调试：直接跳转到胜利结算（普通 / 挑战 / 终极挑战）。</summary>
+        public void DebugForceCampaignVictory(DebugCampaignVictoryKind kind)
+        {
+            if (!HasLevels || database == null)
+            {
+                Debug.LogWarning("[LevelManager] 无关卡，无法调试胜利结算。");
+                return;
+            }
+
+            var ordered = database.GetOrdered();
+            if (ordered.Count == 0)
+            {
+                Debug.LogWarning("[LevelManager] 关卡列表为空。");
+                return;
+            }
+
+            int lastIndex = ordered.Count - 1;
+            var lastLevel = ordered[lastIndex];
+
+            _levelListIndex = lastIndex;
+            _current = lastLevel;
+            _levelTurnIndex = lastLevel.MaxTurns;
+            _outcome = LevelOutcome.Won;
+            _awaitingClearSequence = false;
+            _rewards.Clear();
+            _levelsClearedCount = ordered.Count;
+
+            _levelChallengeReachedFlags.Clear();
+            for (int i = 0; i < ordered.Count; i++)
+                _levelChallengeReachedFlags.Add(false);
+
+            bool allChallenge = kind != DebugCampaignVictoryKind.Normal;
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                if (ordered[i].ChallengeScore <= 0) continue;
+                _levelChallengeReachedFlags[i] = allChallenge;
+            }
+
+            _lastFinishedScore = kind switch
+            {
+                DebugCampaignVictoryKind.Normal => lastLevel.TargetScore,
+                DebugCampaignVictoryKind.Challenge => Mathf.Max(lastLevel.ChallengeScore, lastLevel.TargetScore),
+                DebugCampaignVictoryKind.UltimateChallenge => Mathf.Max(
+                    lastLevel.UltimateChallengeScore > 0
+                        ? lastLevel.UltimateChallengeScore
+                        : lastLevel.ChallengeScore,
+                    lastLevel.TargetScore),
+                _ => lastLevel.TargetScore
+            };
+
+            TurnManager.Instance?.ResetLevelScore();
+            RecallEmployeesToStandby();
+            CampaignCompleted?.Invoke();
+            RaiseChanged();
+            GameSessionLaunch.GoToVictorySettlement();
+        }
+
+        private void RecordCurrentLevelChallengeResult()
+        {
+            if (_current == null) return;
+            while (_levelChallengeReachedFlags.Count <= _levelListIndex)
+                _levelChallengeReachedFlags.Add(false);
+            _levelChallengeReachedFlags[_levelListIndex] = ChallengeScoreReached;
         }
 
         /// <summary>
@@ -622,24 +718,29 @@ namespace Soup.Levels
         }
 
         /// <summary>
-        /// 通关流程：非最后一关 → 关卡间领奖；最后一关 → 不进关卡间，直接宣布胜利。
+        /// 通关流程：非最后一关 → 关卡间领奖；最后一关 → 胜利结算场景。
         /// </summary>
         private void BeginLevelClearSequence(
             bool restoreRewards = false,
             bool rewardElvesClaimed = false,
             bool rewardWarehouseClaimed = false,
             bool rewardRelicClaimed = false,
+            bool rewardShopClaimed = false,
             bool rewardAdvanceClaimed = false,
             bool rewardEventsClaimed = false,
+            bool rewardStandardStageEventsStarted = false,
             int rewardGatherCharges = 0,
             int rewardProcessCharges = 0,
             int rewardCookCharges = 0,
-            IList<string> rewardRelicOfferIds = null)
+            IList<string> rewardRelicOfferIds = null,
+            IList<string> rewardShopOfferIds = null,
+            IList<string> rewardGatherUnlockOfferIds = null,
+            IList<string> rewardProcessUnlockOfferIds = null)
         {
             if (!HasLevels || _current == null) return;
             if (_outcome != LevelOutcome.Won) return;
 
-            // 最后一关：跳过关卡间。
+            // 最后一关：跳过关卡间，进入全战役胜利结算。
             if (GetNextLevel() == null)
             {
                 if (!restoreRewards)
@@ -651,7 +752,7 @@ namespace Soup.Levels
                 _rewards.Clear();
                 CampaignCompleted?.Invoke();
                 RaiseChanged();
-                GameSessionLaunch.DeclareCampaignVictory();
+                GameSessionLaunch.GoToVictorySettlement();
                 return;
             }
 
@@ -660,12 +761,17 @@ namespace Soup.Levels
                 rewardElvesClaimed,
                 rewardWarehouseClaimed,
                 rewardRelicClaimed,
+                rewardShopClaimed,
                 rewardAdvanceClaimed,
-                rewardEventsClaimed,
-                rewardGatherCharges,
+                    rewardEventsClaimed,
+                    rewardStandardStageEventsStarted,
+                    rewardGatherCharges,
                 rewardProcessCharges,
                 rewardCookCharges,
-                rewardRelicOfferIds);
+                rewardRelicOfferIds,
+                rewardShopOfferIds,
+                rewardGatherUnlockOfferIds,
+                rewardProcessUnlockOfferIds);
         }
 
         private void OpenClearRewards(
@@ -673,12 +779,17 @@ namespace Soup.Levels
             bool rewardElvesClaimed = false,
             bool rewardWarehouseClaimed = false,
             bool rewardRelicClaimed = false,
+            bool rewardShopClaimed = false,
             bool rewardAdvanceClaimed = false,
             bool rewardEventsClaimed = false,
+            bool rewardStandardStageEventsStarted = false,
             int rewardGatherCharges = 0,
             int rewardProcessCharges = 0,
             int rewardCookCharges = 0,
-            IList<string> rewardRelicOfferIds = null)
+            IList<string> rewardRelicOfferIds = null,
+            IList<string> rewardShopOfferIds = null,
+            IList<string> rewardGatherUnlockOfferIds = null,
+            IList<string> rewardProcessUnlockOfferIds = null)
         {
             if (restore)
             {
@@ -689,12 +800,17 @@ namespace Soup.Levels
                     rewardElvesClaimed,
                     rewardWarehouseClaimed,
                     rewardRelicClaimed,
+                    rewardShopClaimed,
                     rewardAdvanceClaimed,
                     rewardEventsClaimed,
+                    rewardStandardStageEventsStarted,
                     rewardGatherCharges,
                     rewardProcessCharges,
                     rewardCookCharges,
-                    rewardRelicOfferIds);
+                    rewardRelicOfferIds,
+                    rewardShopOfferIds,
+                    rewardGatherUnlockOfferIds,
+                    rewardProcessUnlockOfferIds);
             }
             else
             {

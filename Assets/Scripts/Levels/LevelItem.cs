@@ -24,6 +24,10 @@ namespace Soup.Levels
         [SerializeField, Min(1)] private int targetScore = 50;
         [Tooltip("本关允许的最大回合数。回合用尽后先结算酸涩，再判定是否达标。")]
         [SerializeField, Min(1)] private int maxTurns = 10;
+        [Tooltip("挑战分数（可选）。不影响通关判定，仅作额外目标展示。")]
+        [SerializeField, Min(0)] private int challengeScore;
+        [Tooltip("终极挑战分数（可选，如第五关）。不影响通关判定，仅作额外目标展示。")]
+        [SerializeField, Min(0)] private int ultimateChallengeScore;
 
         public string Id => id;
         public string DisplayName => displayName;
@@ -31,6 +35,10 @@ namespace Soup.Levels
         public int OrderIndex => orderIndex;
         public int TargetScore => targetScore;
         public int MaxTurns => maxTurns;
+        public int ChallengeScore => challengeScore;
+        public bool HasChallengeScore => challengeScore > 0;
+        public int UltimateChallengeScore => ultimateChallengeScore;
+        public bool HasUltimateChallengeScore => ultimateChallengeScore > 0;
 
         public void SetIdentity(string newId, string newDisplayName)
         {
@@ -42,10 +50,80 @@ namespace Soup.Levels
 
         public void SetOrderIndex(int value) => orderIndex = Mathf.Max(1, value);
 
-        public void SetVictory(int scoreTarget, int turnsLimit)
+        public void SetVictory(int scoreTarget, int turnsLimit, int challenge = 0, int ultimateChallenge = 0)
         {
             targetScore = Mathf.Max(1, scoreTarget);
             maxTurns = Mathf.Max(1, turnsLimit);
+            challengeScore = Mathf.Max(0, challenge);
+            ultimateChallengeScore = Mathf.Max(0, ultimateChallenge);
+        }
+
+        public void SetChallengeScore(int value) => challengeScore = Mathf.Max(0, value);
+
+        public void SetUltimateChallengeScore(int value) =>
+            ultimateChallengeScore = Mathf.Max(0, value);
+
+        private string FormatOptionalScoreExtras(int gained)
+        {
+            bool hasChallenge = challengeScore > 0;
+            bool hasUltimate = ultimateChallengeScore > 0;
+            if (!hasChallenge && !hasUltimate)
+                return string.Empty;
+
+            string challengePart = string.Empty;
+            if (hasChallenge)
+            {
+                challengePart = gained >= challengeScore
+                    ? "挑战达成"
+                    : $"挑战 {challengeScore}";
+            }
+
+            string ultimatePart = string.Empty;
+            if (hasUltimate)
+            {
+                ultimatePart = gained >= ultimateChallengeScore
+                    ? "终极挑战达成"
+                    : $"终极挑战 {ultimateChallengeScore}";
+            }
+
+            if (hasChallenge && hasUltimate)
+                return $"（{challengePart}；{ultimatePart}）";
+            if (hasChallenge)
+                return $"（{challengePart}）";
+            return $"（{ultimatePart}）";
+        }
+
+        /// <summary>HUD：通关目标与挑战进度（挑战分不影响通关判定）。</summary>
+        public string FormatScoreProgress(int gained)
+        {
+            string line = $"得分 {Mathf.Max(0, gained)}/{targetScore}";
+            line += FormatOptionalScoreExtras(gained);
+            return line;
+        }
+
+        /// <summary>关卡间结算页副标题。</summary>
+        public string FormatSettlementCaption(int score)
+        {
+            int gained = Mathf.Max(0, score);
+            if (targetScore <= 0)
+                return $"本关得分\n<size=64>{gained}</size>";
+
+            string caption = $"本关得分\n<size=64>{gained}</size>\n<size=22>目标 {targetScore}</size>";
+            if (challengeScore > 0)
+            {
+                caption += gained >= challengeScore
+                    ? $"\n<size=20>挑战 {challengeScore} · 已达成</size>"
+                    : $"\n<size=20>挑战 {challengeScore}</size>";
+            }
+
+            if (ultimateChallengeScore > 0)
+            {
+                caption += gained >= ultimateChallengeScore
+                    ? $"\n<size=20>终极挑战 {ultimateChallengeScore} · 已达成</size>"
+                    : $"\n<size=20>终极挑战 {ultimateChallengeScore}</size>";
+            }
+
+            return caption;
         }
 
         public void EnsureDefaultIdFromName()
@@ -91,6 +169,8 @@ namespace Soup.Levels
             orderIndex = Mathf.Max(1, orderIndex);
             targetScore = Mathf.Max(1, targetScore);
             maxTurns = Mathf.Max(1, maxTurns);
+            challengeScore = Mathf.Max(0, challengeScore);
+            ultimateChallengeScore = Mathf.Max(0, ultimateChallengeScore);
         }
 #endif
     }

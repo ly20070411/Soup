@@ -178,7 +178,7 @@ MonoBehaviour:
     allGlobalLaborEfficiencyCap: 0
     endTurnIncentiveChancePerWorker: 0
     endTurnIncentiveMaxPerLevel: 0
-    suppressRawMaterialOutput: 0
+    suppressRawMaterialOutput: 1
     flatColdBonus: 0
     flatSpicyBonus: 0
     designatedPairFlavorYieldBonus: 0
@@ -455,7 +455,7 @@ MonoBehaviour:
     allGlobalLaborEfficiencyCap: 0
     endTurnIncentiveChancePerWorker: 0
     endTurnIncentiveMaxPerLevel: 0
-    suppressRawMaterialOutput: 0
+    suppressRawMaterialOutput: 1
     flatColdBonus: 0
     flatSpicyBonus: 0
     designatedPairFlavorYieldBonus: 0
@@ -548,7 +548,7 @@ MonoBehaviour:
     allGlobalLaborEfficiencyCap: 0
     endTurnIncentiveChancePerWorker: 0
     endTurnIncentiveMaxPerLevel: 0
-    suppressRawMaterialOutput: 0
+    suppressRawMaterialOutput: 1
     flatColdBonus: 0
     flatSpicyBonus: 0
     designatedPairFlavorYieldBonus: 0

@@ -97,14 +97,14 @@ MonoBehaviour:
     solidPerWarehouseSolidAmount: 0
     gatherUnitsPerProcessedThreshold: 0
     gatherUnitsPerProcessedAmount: 0
-    processAmountOverride: 200
+    processAmountOverride: 240
     otherMaterialEfficiencyOverride: 0.25
     materialRefundMaterial: 0
     materialRefundPerProcessedThreshold: 0
     materialRefundPerProcessedAmount: 0
     grantEmployeeId: 
     grantEmployeeCount: 0
-    effectDescription: "\u4F18\u5148\u5904\u7406 200 \u4EFD\u575A\u56FA\u98DF\u6750\uFF0C\u5176\u4ED6\u98DF\u6750\u6548\u7387\u53D8\u4E3A
+    effectDescription: "\u4F18\u5148\u5904\u7406 240 \u4EFD\u575A\u56FA\u98DF\u6750\uFF0C\u5176\u4ED6\u98DF\u6750\u6548\u7387\u53D8\u4E3A
       25%"
   path2:
     displayName: "\u7A33\u91CF"

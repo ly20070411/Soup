@@ -762,8 +762,9 @@ namespace Soup.Jobs
             path2.SetDisplayName("大团球");
             path2.SetMaxWorkersBonus(0);
             path2.SetMaxWorkersOverride(5);
+            path2.SetSuppressRawMaterialOutput(true);
             path2.SetBonusIngredient(bigBall, 1);
-            path2.SetEffectDescription("岗位上限永久为 5，生产 1 份大团球");
+            path2.SetEffectDescription("岗位上限永久为 5，不再生产甜团团，改为生产 1 份大团球");
 
             path1_1.SetDisplayName("堆料");
             path1_1.SetMaxWorkersBonus(pop);
@@ -778,14 +779,16 @@ namespace Soup.Jobs
             path2_1.SetDisplayName("双团球");
             path2_1.SetMaxWorkersBonus(0);
             path2_1.SetMaxWorkersOverride(5);
+            path2_1.SetSuppressRawMaterialOutput(true);
             path2_1.SetBonusIngredient(bigBall, 2);
-            path2_1.SetEffectDescription("岗位上限永久为 5，生产 2 份大团球");
+            path2_1.SetEffectDescription("岗位上限永久为 5，不再生产甜团团，改为生产 2 份大团球");
 
             path2_2.SetDisplayName("巨团山");
             path2_2.SetMaxWorkersBonus(0);
             path2_2.SetMaxWorkersOverride(1);
+            path2_2.SetSuppressRawMaterialOutput(true);
             path2_2.SetBonusIngredient(giantMountain, 1);
-            path2_2.SetEffectDescription("岗位上限永久为 1，生产 1 份巨团山");
+            path2_2.SetEffectDescription("岗位上限永久为 1，不再生产甜团团，改为生产 1 份巨团山");
         }
 
         /// <summary>
@@ -1236,7 +1239,7 @@ namespace Soup.Jobs
 
         /// <summary>
         /// 钻头岗设计进阶树（结构同刀切/电锯，优先材质为坚固）。
-        /// 基础：优先 120 坚固，其他效率 50%；1：200 / 25% → 1-1 360 / 25% / 1-2 无；
+        /// 基础：优先 120 坚固，其他效率 50%；1：240 / 25% → 1-1 360 / 25% / 1-2 无；
         /// 2：180 / 50% → 2-1 240 / 50% 且每处理 10 份任意食材生成 1 处理 / 2-2 无。
         /// </summary>
         public void SeedDrillAdvanceTree()
@@ -1252,9 +1255,9 @@ namespace Soup.Jobs
 
             path1.SetDisplayName("加量");
             path1.SetMaxWorkersBonus(pop);
-            path1.SetProcessAmountOverride(200);
+            path1.SetProcessAmountOverride(240);
             path1.SetOtherMaterialEfficiencyOverride(0.25f);
-            path1.SetEffectDescription("优先处理 200 份坚固食材，其他食材效率变为 25%");
+            path1.SetEffectDescription("优先处理 240 份坚固食材，其他食材效率变为 25%");
 
             path2.SetDisplayName("稳量");
             path2.SetMaxWorkersBonus(pop);

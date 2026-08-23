@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: ghost_urn
   displayName: "\u5E7D\u7075\u74EE"
-  description: "\u5E7D\u7075\u7684\u5DE5\u4F5C\u6548\u7387\u52A0 0.2\u3002"
-  icon: {fileID: 0}
+  description: "\u5E7D\u7075\u7684\u5DE5\u4F5C\u6548\u7387\u52A00.2\u3002"
+  icon: {fileID: 21300000, guid: 56ebb540963c2214cb388171c80e6b0a, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 0

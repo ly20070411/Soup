@@ -41,9 +41,13 @@ namespace Soup.Game
             {
                 if (store != null)
                 {
-                    capacityMesh.text = store.WarehouseCapacity <= 0
-                        ? "∞"
-                        : store.WarehouseSpace.ToString();
+                    int cap = store.WarehouseCapacity;
+                    int space = store.WarehouseSpace;
+                    if (cap <= 0)
+                        capacityMesh.text = "∞";
+                    else
+                        // Show remaining/cap so filling stock doesn't look like the warehouse shrank.
+                        capacityMesh.text = $"{space}/{cap}";
                 }
                 else if (!Application.isPlaying)
                 {
@@ -102,7 +106,7 @@ namespace Soup.Game
 
             if (capacityCaption != null)
             {
-                capacityCaption.text = "余量";
+                capacityCaption.text = "余量/上限";
                 capacityCaption.color = GatherHudText.Muted;
             }
 

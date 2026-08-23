@@ -194,7 +194,11 @@ namespace Soup.Game
                 _gatherPanel.SetActive(show);
             _open = show || (_processPanel != null && _processPanel.activeSelf);
 
-            if (!show) return;
+            if (!show)
+            {
+                HoverTooltipHub.HideIfPresent();
+                return;
+            }
 
             for (int i = 0; i < _gatherButtons.Length; i++)
             {
@@ -205,12 +209,8 @@ namespace Soup.Game
 
                 var job = _gatherChoices[i];
                 if (_gatherLabels[i] != null)
-                {
-                    string desc = string.IsNullOrWhiteSpace(job.Description)
-                        ? "采集岗位"
-                        : job.Description;
-                    _gatherLabels[i].text = $"{job.DisplayName}\n{desc}";
-                }
+                    _gatherLabels[i].text = job.DisplayName;
+                BindJobOptionHover(_gatherButtons[i], job);
             }
         }
 
@@ -220,7 +220,11 @@ namespace Soup.Game
                 _processPanel.SetActive(show);
             _open = show || (_gatherPanel != null && _gatherPanel.activeSelf);
 
-            if (!show) return;
+            if (!show)
+            {
+                HoverTooltipHub.HideIfPresent();
+                return;
+            }
 
             for (int i = 0; i < _processButtons.Length; i++)
             {
@@ -231,13 +235,19 @@ namespace Soup.Game
 
                 var job = _processChoices[i];
                 if (_processLabels[i] != null)
-                {
-                    string desc = string.IsNullOrWhiteSpace(job.Description)
-                        ? "处理方法"
-                        : job.Description;
-                    _processLabels[i].text = $"{job.DisplayName}\n{desc}";
-                }
+                    _processLabels[i].text = job.DisplayName;
+                BindJobOptionHover(_processButtons[i], job);
             }
+        }
+
+        private static void BindJobOptionHover(Button button, JobItem job)
+        {
+            if (button == null || job == null) return;
+            HoverTooltipText.JobStation(job, out string title, out string body);
+            var tip = button.GetComponent<UiHoverTooltip>();
+            if (tip == null)
+                tip = button.gameObject.AddComponent<UiHoverTooltip>();
+            tip.Bind(title, body);
         }
 
         private void OnGatherChosen(int index)
@@ -344,7 +354,7 @@ namespace Soup.Game
 
         private void BuildProcessPanel(Transform parent)
         {
-            _processPanel = BuildModalPanel(parent, "ProcessStarterPanel", 780f, 560f,
+            _processPanel = BuildModalPanel(parent, "ProcessStarterPanel", 780f, 640f,
                 "选择处理方法",
                 "四选一，选定后解锁并显示在处理区空位上");
 
@@ -358,12 +368,12 @@ namespace Soup.Game
                     $"ProcessOption{i}",
                     $"处理 {i + 1}",
                     new Vector2(0f, y),
-                    new Vector2(700f, 90f));
+                    new Vector2(700f, 110f));
                 button.onClick.AddListener(() => OnProcessChosen(captured));
                 _processButtons[i] = button;
                 _processLabels[i] = button.transform.Find("Label")?.GetComponent<Text>();
                 StyleChoiceLabel(_processLabels[i]);
-                y -= 100f;
+                y -= 120f;
             }
         }
 

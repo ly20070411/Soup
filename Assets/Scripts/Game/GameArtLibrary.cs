@@ -42,6 +42,17 @@ namespace Soup.Game
         [SerializeField] private Sprite titleContinueButton;
         [SerializeField] private Sprite titleQuitButton;
 
+        [Header("Shop")]
+        [SerializeField] private Sprite shopBackground;
+        [SerializeField] private Sprite shopCatPortrait;
+
+        [Header("Event Panel")]
+        [SerializeField] private Sprite eventPanelBackground;
+        [SerializeField] private Sprite eventIllustrationFrame;
+
+        [Header("Victory Settlement")]
+        [SerializeField] private Sprite victorySettlementBackground;
+
         public Sprite ZoneSwitchLeft => zoneSwitchLeft;
         public Sprite ZoneSwitchRight => zoneSwitchRight;
         public Sprite DividerHorizontal => dividerHorizontal;
@@ -62,6 +73,11 @@ namespace Soup.Game
         public Sprite TitleStartButton => titleStartButton;
         public Sprite TitleContinueButton => titleContinueButton;
         public Sprite TitleQuitButton => titleQuitButton;
+        public Sprite ShopBackground => shopBackground;
+        public Sprite ShopCatPortrait => shopCatPortrait;
+        public Sprite EventPanelBackground => eventPanelBackground;
+        public Sprite EventIllustrationFrame => eventIllustrationFrame;
+        public Sprite VictorySettlementBackground => victorySettlementBackground;
 
         public void SetZoneSwitch(Sprite left, Sprite right)
         {
@@ -122,6 +138,19 @@ namespace Soup.Game
             titleContinueButton = continueButton;
             titleQuitButton = quitButton;
         }
+
+        public void SetShopArt(Sprite background, Sprite catPortrait)
+        {
+            shopBackground = background;
+            shopCatPortrait = catPortrait;
+        }
+
+        public void SetEventPanelBackground(Sprite background) => eventPanelBackground = background;
+
+        public void SetEventIllustrationFrame(Sprite frame) => eventIllustrationFrame = frame;
+
+        public void SetVictorySettlementBackground(Sprite background) =>
+            victorySettlementBackground = background;
 
         public static GameArtLibrary Load()
         {

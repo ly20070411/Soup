@@ -50,7 +50,10 @@ namespace Soup.Game.Editor
             RemoveChild(zone.transform, "画面范围");
 
             var artSr = art.GetComponent<SpriteRenderer>();
+            MatchCookBackdropToGather(art, artSr);
             var scoreHud = EnsureScoreHud(art);
+            var processedHud = EnsureProcessedDeltaHud(art);
+            var levelGoalHud = EnsureLevelGoalHud(art);
             var heats = new CookHeatSlot[CookZoneView.HeatStationCount];
             for (int i = 0; i < heats.Length; i++)
                 heats[i] = EnsureHeatSlot(art, i);
@@ -59,6 +62,12 @@ namespace Soup.Game.Editor
             so.FindProperty("background").objectReferenceValue = artSr;
             so.FindProperty("artRoot").objectReferenceValue = art;
             so.FindProperty("scoreHud").objectReferenceValue = scoreHud;
+            var processedProp = so.FindProperty("processedDeltaHud");
+            if (processedProp != null)
+                processedProp.objectReferenceValue = processedHud;
+            var levelGoalProp = so.FindProperty("levelGoalHud");
+            if (levelGoalProp != null)
+                levelGoalProp.objectReferenceValue = levelGoalHud;
             var heatProp = so.FindProperty("heatStations");
             heatProp.arraySize = heats.Length;
             for (int i = 0; i < heats.Length; i++)
@@ -69,7 +78,7 @@ namespace Soup.Game.Editor
             CookZoneDrawMenu.FocusCookZone(zone);
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
             EditorSceneManager.SaveOpenScenes();
-            return $"CookZone wired heats={heats.Length} scoreHud=True art={art.name}";
+            return $"CookZone wired heats={heats.Length} scoreHud=True processedDelta=True levelGoal=True art={art.name}";
         }
 
         private static Transform FindCookArt()
@@ -96,6 +105,24 @@ namespace Soup.Game.Editor
             return null;
         }
 
+        /// <summary>
+        /// Keep cook backdrop world size aligned with gather, even if Bind Art
+        /// temporarily resets the cook PNG to icon-style PPU.
+        /// </summary>
+        private static void MatchCookBackdropToGather(Transform art, SpriteRenderer artSr)
+        {
+            if (art == null || artSr == null || artSr.sprite == null) return;
+            var gather = Object.FindObjectOfType<GatherZoneView>(true);
+            if (gather == null || gather.Background == null) return;
+
+            Vector2 target = gather.Background.bounds.size;
+            Vector2 local = artSr.sprite.bounds.size;
+            if (local.x < 0.01f || local.y < 0.01f || target.x < 0.1f || target.y < 0.1f)
+                return;
+
+            art.localScale = new Vector3(target.x / local.x, target.y / local.y, 1f);
+        }
+
         private static CookScoreHud EnsureScoreHud(Transform art)
         {
             var existing = art.GetComponent<CookScoreHud>();
@@ -104,6 +131,8 @@ namespace Soup.Game.Editor
 
             existing.EnsureTexts();
             PlaceText(art, "StageScore", ScoreBurstLocal, 0.20f, 52, new Color(0.55f, 0.12f, 0.05f, 1f));
+            PlaceText(art, "StageMult", new Vector3(-2.12f, 2.39f, -0.02f), 0.15f, 30,
+                new Color(0.55f, 0.12f, 0.05f, 0.92f));
             PlaceText(art, "SpicyScore", SpicyLocal, 0.15f, 34, Color.white);
             PlaceText(art, "ColdScore", ColdLocal, 0.15f, 34, Color.white);
             PlaceText(art, "SourScore", SourLocal, 0.15f, 34, Color.white);
@@ -111,11 +140,32 @@ namespace Soup.Game.Editor
 
             var so = new SerializedObject(existing);
             so.FindProperty("stageScoreMesh").objectReferenceValue = FindText(art, "StageScore");
+            so.FindProperty("stageMultMesh").objectReferenceValue = FindText(art, "StageMult");
             so.FindProperty("spicyMesh").objectReferenceValue = FindText(art, "SpicyScore");
             so.FindProperty("coldMesh").objectReferenceValue = FindText(art, "ColdScore");
             so.FindProperty("sourMesh").objectReferenceValue = FindText(art, "SourScore");
             so.FindProperty("magicMesh").objectReferenceValue = FindText(art, "MagicScore");
             so.ApplyModifiedPropertiesWithoutUndo();
+            existing.Refresh();
+            return existing;
+        }
+
+        private static CookProcessedDeltaHud EnsureProcessedDeltaHud(Transform art)
+        {
+            var existing = art.GetComponent<CookProcessedDeltaHud>();
+            if (existing == null)
+                existing = art.gameObject.AddComponent<CookProcessedDeltaHud>();
+            existing.EnsureSign();
+            existing.Refresh();
+            return existing;
+        }
+
+        private static CookLevelGoalHud EnsureLevelGoalHud(Transform art)
+        {
+            var existing = art.GetComponent<CookLevelGoalHud>();
+            if (existing == null)
+                existing = art.gameObject.AddComponent<CookLevelGoalHud>();
+            existing.EnsureTexts();
             existing.Refresh();
             return existing;
         }

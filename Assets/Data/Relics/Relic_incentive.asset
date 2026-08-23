@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: incentive
   displayName: "\u6FC0\u52B1"
-  description: "\u5168\u5C40\u5DE5\u4F5C\u6548\u7387\u52A0 0.1\u3002\u53EF\u91CD\u590D\u83B7\u5F97\uFF0C\u6BCF\u4EF6\u53E0\u52A0\u3002"
-  icon: {fileID: 0}
+  description: "\u5168\u5C40\u5DE5\u4F5C\u6548\u7387\u52A00.1\uFF0C\u53EF\u91CD\u590D\u83B7\u5F97\u3002"
+  icon: {fileID: 21300000, guid: ee4860803048364469a3a7b463a339af, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 1

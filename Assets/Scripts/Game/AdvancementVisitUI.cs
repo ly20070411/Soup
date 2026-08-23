@@ -116,8 +116,10 @@ namespace Soup.Game
                 _root.SetActive(true);
             CloseAllPopups();
 
-            var cam = FindObjectOfType<ZoneCameraController>();
-            cam?.SnapToZone(AdvancementVisit.Zone);
+            ZoneViewFraming.ApplyZoneCamera(
+                FindObjectOfType<ZoneCameraController>(),
+                AdvancementVisit.Zone,
+                snap: true);
 
             var overlay = FindObjectOfType<GameOverlayUI>();
             overlay?.SetPlayHudVisible(false);
@@ -403,9 +405,11 @@ namespace Soup.Game
             string title = node != null && !string.IsNullOrWhiteSpace(node.DisplayName)
                 ? node.DisplayName.Trim()
                 : $"路径 {JobAdvancePath.ToLabel(nodeId)}";
+            title = HoverTooltipText.AnnotateAdvanceNodeIngredientLabel(node, title);
             string effect = node != null && !string.IsNullOrWhiteSpace(node.EffectDescription)
                 ? node.EffectDescription.Trim()
                 : "（暂无效果说明）";
+            effect = HoverTooltipText.AnnotateEffectIngredientRefs(node, effect);
             string pop = node != null && node.MaxWorkersBonus > 0
                 ? $"+{node.MaxWorkersBonus} 人口"
                 : "无人口加成";
@@ -516,12 +520,30 @@ namespace Soup.Game
                 rect.sizeDelta = new Vector2(0f, 68f);
                 rect.anchoredPosition = new Vector2(0f, -8f - i * 76f);
 
+                var label = button.transform.Find("Label")?.GetComponent<Text>();
+                if (label != null)
+                {
+                    label.fontSize = 22;
+                    label.alignment = TextAnchor.MiddleCenter;
+                }
+
                 _unlockRowButtons.Add(button);
+                BindJobHover(button.gameObject, job);
             }
 
             var contentRect = _unlockListContent as RectTransform;
             if (contentRect != null)
                 contentRect.sizeDelta = new Vector2(0f, Mathf.Max(120f, _unlockCandidates.Count * 76f + 16f));
+        }
+
+        private static void BindJobHover(GameObject host, JobItem job)
+        {
+            if (host == null || job == null) return;
+            HoverTooltipText.JobStation(job, out string title, out string body);
+            var tip = host.GetComponent<UiHoverTooltip>();
+            if (tip == null)
+                tip = host.AddComponent<UiHoverTooltip>();
+            tip.Bind(title, body);
         }
 
         private void RefreshUnlockPopupContent()
@@ -533,7 +555,7 @@ namespace Soup.Game
             if (_unlockHint != null)
             {
                 _unlockHint.text = _unlockCandidates.Count > 0
-                    ? "从随机至多三个岗位中选一个。未选中的下次仍可能出现；确认后消耗本区次数并返回关卡间。"
+                    ? "从本关随机确定的至多三个岗位中选一个（悬停可查看基础与进阶效果）。取消后再次选择选项不变；确认后消耗本区次数并返回关卡间。"
                     : "没有可解锁的岗位。";
             }
 
@@ -569,6 +591,7 @@ namespace Soup.Game
         {
             _pendingUnlock = null;
             _unlockCandidates.Clear();
+            HoverTooltipHub.HideIfPresent();
             if (_unlockPopupRoot != null)
                 _unlockPopupRoot.SetActive(false);
         }

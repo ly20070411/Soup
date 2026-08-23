@@ -18,11 +18,13 @@ namespace Soup.Game
 
         private Vector2 _panelScroll;
         private Vector2 _jobScroll;
-        private Vector2 _relicScroll;
         private Vector2 _progressScroll;
         private string _lastResult = string.Empty;
         private readonly List<JobItem> _jobsCache = new List<JobItem>();
-        private RelicAcquireStage _debugStage = RelicAcquireStage.Shop;
+        /// <summary>null = 全部来源（调试默认，避免新遗物被商店/事件筛选漏掉）。</summary>
+        private RelicAcquireStage? _debugStageFilter;
+        private string _relicSearch = string.Empty;
+        private Vector2 _ownedRelicScroll;
         private JobType _advanceType = JobType.Gather;
         private JobItem _gatherReplaceTarget;
         private GUIStyle _titleLabel;
@@ -37,6 +39,8 @@ namespace Soup.Game
         private bool _sectionProgressionOpen;
         private bool _sectionJobsOpen = true;
         private bool _sectionResultOpen = true;
+        private int _debugEventIndex;
+        private readonly List<EventItem> _debugEventCache = new List<EventItem>();
         private string _editSoft = "0";
         private string _editTough = "0";
         private string _editSolid = "0";
@@ -60,14 +64,20 @@ namespace Soup.Game
         {
             visible = open;
             if (open)
+            {
                 _valueFieldsSynced = false;
+                RelicManager.Instance?.ReloadDatabaseFromResources();
+            }
         }
 
         public void TogglePanelMode()
         {
             visible = !visible;
             if (visible)
+            {
                 _valueFieldsSynced = false;
+                RelicManager.Instance?.ReloadDatabaseFromResources();
+            }
         }
 
         private void OnEnable()
@@ -108,10 +118,11 @@ namespace Soup.Game
             {
                 visible = !visible;
                 if (visible)
+                {
                     _valueFieldsSynced = false;
+                    RelicManager.Instance?.ReloadDatabaseFromResources();
+                }
             }
-            else if (visible && Input.GetKeyDown(KeyCode.Escape))
-                visible = false;
         }
 
         private void OnTurnResolved(TurnResult result)
@@ -162,7 +173,7 @@ namespace Soup.Game
             }
 
             GUILayout.Space(6f);
-            if (BeginFoldSection("快捷操作", ref _sectionControlsOpen, "下一回合、撤回、重置、调试事件等"))
+            if (BeginFoldSection("快捷操作", ref _sectionControlsOpen, "下一回合、撤回、重置、测试事件等"))
             {
                 DrawControls();
                 EndFoldSection();
@@ -300,7 +311,7 @@ namespace Soup.Game
             int partsTotal = turns.ScoreFromCook + turns.ScoreFromSpicy + turns.ScoreFromSour
                 + turns.ScoreFromCold + turns.ScoreFromMagic;
             GUILayout.Label(
-                $"组成合计 {partsTotal} = 总分 {turns.Score}（烹饪=岗位烹饪底分，热辣=倍率额外分）",
+                $"组成合计 {partsTotal} = 总分 {turns.Score}（烹饪=岗位烹饪分，热辣=关底倍率额外分）",
                 BodyLabel());
         }
 
@@ -320,7 +331,7 @@ namespace Soup.Game
 
                 GUILayout.BeginHorizontal();
                 Stat($"关卡 {level.DisplayName}", -1);
-                Stat($"得分 {levels.ScoreGainedInLevel}/{level.TargetScore}", -1);
+                Stat(level.FormatScoreProgress(levels.ScoreGainedInLevel), -1);
                 Stat($"回合 {levels.LevelTurnIndex}/{level.MaxTurns}", -1);
                 Stat($"[{status}]", -1);
                 GUILayout.EndHorizontal();
@@ -329,7 +340,7 @@ namespace Soup.Game
                 {
                     GUILayout.BeginHorizontal();
                     Stat("本关烹饪", turns.StageCooked);
-                    GUILayout.Label("酸涩在第 MaxTurns 回合结束后结算，结算分计入本关目标判定", BodyLabel());
+                    GUILayout.Label("酸涩在每一大关（关底）结束时换分，计入本关目标判定", BodyLabel());
                     GUILayout.EndHorizontal();
                 }
 
@@ -341,8 +352,78 @@ namespace Soup.Game
             GUILayout.BeginHorizontal();
             Stat("阶段", turns.StageIndex);
             Stat("本关烹饪", turns.StageCooked);
-            GUILayout.Label("酸涩仅在阶段结算时换分，不会在每回合烹饪时消失", BodyLabel());
+            GUILayout.Label("酸涩在每一大关结束时按已烹饪食材占比换分", BodyLabel());
             GUILayout.EndHorizontal();
+        }
+
+        private void DrawDebugEventPicker()
+        {
+            var events = EventManager.Instance;
+            if (events == null)
+            {
+                GUILayout.Label("EventManager 未就绪", BodyLabel());
+                return;
+            }
+
+            RefreshDebugEventCache(events);
+
+            GUILayout.Space(4f);
+            GUILayout.Label("测试事件（忽略已触发限制）", BoldLabel());
+
+            if (_debugEventCache.Count == 0)
+            {
+                GUILayout.Label("无事件数据（请先 Soup/Event Manager/Seed Sample Events）", BodyLabel());
+                return;
+            }
+
+            _debugEventIndex = Mathf.Clamp(_debugEventIndex, 0, _debugEventCache.Count - 1);
+            var pick = _debugEventCache[_debugEventIndex];
+
+            GUILayout.BeginHorizontal();
+            if (ActionButton("◀", 40f, 36f))
+                _debugEventIndex = (_debugEventIndex - 1 + _debugEventCache.Count) % _debugEventCache.Count;
+
+            GUILayout.Label($"{pick.DisplayName}  ({pick.Id})", BodyLabel(), GUILayout.ExpandWidth(true));
+
+            if (ActionButton("▶", 40f, 36f))
+                _debugEventIndex = (_debugEventIndex + 1) % _debugEventCache.Count;
+
+            GUI.enabled = !events.HasPendingEvent;
+            if (ActionButton("弹出事件", 110f, 36f))
+            {
+                if (events.PresentForDebug(pick))
+                {
+                    _lastResult = $"已弹出事件：{pick.DisplayName}";
+                    SetPanelMode(false);
+                }
+                else
+                    _lastResult = "弹出失败（可能已有待选事件）";
+            }
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
+
+            if (events.HasPendingEvent)
+                GUILayout.Label($"当前待选：{events.PendingEvent.DisplayName}", BodyLabel());
+        }
+
+        private void RefreshDebugEventCache(EventManager events)
+        {
+            _debugEventCache.Clear();
+            var all = events.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var item = all[i];
+                if (item != null)
+                    _debugEventCache.Add(item);
+            }
+
+            _debugEventCache.Sort((a, b) =>
+            {
+                int cmp = string.CompareOrdinal(a.DisplayName, b.DisplayName);
+                return cmp != 0 ? cmp : string.CompareOrdinal(a.Id, b.Id);
+            });
+
+            _debugEventIndex = Mathf.Clamp(_debugEventIndex, 0, Mathf.Max(0, _debugEventCache.Count - 1));
         }
 
         private void DrawEmployeeSummaryRow()
@@ -433,19 +514,6 @@ namespace Soup.Game
                 _lastResult = "已添加 1 幽灵（不占岗，效率 0.8）";
             }
 
-            if (ActionButton("触发示例事件", 140f, 40f))
-            {
-                var events = EventManager.Instance;
-                if (events == null)
-                    _lastResult = "EventManager 未就绪";
-                else if (events.HasPendingEvent)
-                    _lastResult = "已有待选事件";
-                else if (events.PresentById("more_hands") || events.Present(events.All.Count > 0 ? events.All[0] : null))
-                    _lastResult = $"已弹出事件：{events.PendingEvent.DisplayName}";
-                else
-                    _lastResult = "没有可弹出的事件（请先 Soup/Event Manager/Seed Sample Events）";
-            }
-
             if (ActionButton("关卡间", 110f, 40f))
             {
                 if (levels == null || !levels.HasLevels)
@@ -460,9 +528,42 @@ namespace Soup.Game
                 }
             }
 
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (levels != null && levels.HasLevels)
+            {
+                if (ActionButton("普通胜利", 100f, 36f))
+                {
+                    levels.DebugForceCampaignVictory(DebugCampaignVictoryKind.Normal);
+                    _lastResult = "已跳转：普通胜利结算";
+                    SetPanelMode(false);
+                }
+
+                if (ActionButton("挑战胜利", 100f, 36f))
+                {
+                    levels.DebugForceCampaignVictory(DebugCampaignVictoryKind.Challenge);
+                    _lastResult = "已跳转：挑战胜利结算";
+                    SetPanelMode(false);
+                }
+
+                if (ActionButton("终极挑战胜利", 130f, 36f))
+                {
+                    levels.DebugForceCampaignVictory(DebugCampaignVictoryKind.UltimateChallenge);
+                    _lastResult = "已跳转：终极挑战胜利结算";
+                    SetPanelMode(false);
+                }
+            }
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
             GUILayout.Label($"[{toggleKey}] 显隐", BodyLabel());
             GUILayout.EndHorizontal();
+
+            DrawDebugEventPicker();
 
             var eventMgr = EventManager.Instance;
             if (eventMgr != null)
@@ -622,39 +723,54 @@ namespace Soup.Game
                 return;
             }
 
+            // RelicManager 在打开面板时已 ReloadDatabaseFromResources。
+
             GUILayout.BeginHorizontal();
-            GUILayout.Label("调试获取阶段:", BodyLabel(), GUILayout.Width(120f));
-            if (ActionButton(RelicItem.StageLabel(_debugStage), 110f, 32f))
+            GUILayout.Label("筛选:", BodyLabel(), GUILayout.Width(48f));
+            string stageLabel = _debugStageFilter.HasValue
+                ? RelicItem.StageLabel(_debugStageFilter.Value)
+                : "全部来源";
+            if (ActionButton(stageLabel, 130f, 32f))
+                CycleDebugRelicStageFilter();
+
+            if (ActionButton("刷新库", 80f, 32f))
             {
-                _debugStage = _debugStage == RelicAcquireStage.Shop
-                    ? RelicAcquireStage.Event
-                    : RelicAcquireStage.Shop;
+                relics.ReloadDatabaseFromResources();
+                _lastResult = $"遗物库已刷新，共 {relics.All.Count} 个";
             }
 
-            if (ActionButton("获取该来源全部", 140f, 32f))
+            if (ActionButton("获取筛选全部", 140f, 32f))
             {
-                var list = relics.GetRelicsForStage(_debugStage);
+                var list = relics.GetRelicsForDebug(_debugStageFilter);
                 int gained = 0;
                 for (int i = 0; i < list.Count; i++)
                 {
-                    if (relics.Acquire(list[i]))
+                    if (MatchesRelicSearch(list[i]) && relics.Acquire(list[i]))
                         gained++;
                 }
 
-                _lastResult = $"{RelicItem.StageLabel(_debugStage)} 新获取 {gained} 个遗物";
+                _lastResult = $"{stageLabel} 新获取 {gained} 个遗物";
             }
 
             GUILayout.FlexibleSpace();
-            GUILayout.Label($"持有 {relics.Owned.Count}", BodyLabel());
+            GUILayout.Label($"库 {relics.All.Count} · 持有 {relics.Owned.Count}", BodyLabel());
             GUILayout.EndHorizontal();
 
-            _relicScroll = GUILayout.BeginScrollView(_relicScroll, GUILayout.MinHeight(180f), GUILayout.MaxHeight(320f));
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("搜索:", BodyLabel(), GUILayout.Width(48f));
+            _relicSearch = GUILayout.TextField(_relicSearch ?? string.Empty, TextFieldStyle(), GUILayout.MinWidth(200f));
+            GUILayout.EndHorizontal();
 
-            // Owned
+            GUILayout.Space(4f);
+            GUILayout.Label("局内持有", BoldLabel());
             if (relics.Owned.Count == 0)
-                GUILayout.Label("（空）用上方调试按钮按来源获取。商店遗物在关卡间商店购买。", BodyLabel());
+            {
+                GUILayout.Label("（空）下方可选列表直接获取；商店遗物也可在关卡间购买。", BodyLabel());
+            }
             else
             {
+                _ownedRelicScroll = GUILayout.BeginScrollView(
+                    _ownedRelicScroll, GUILayout.MinHeight(72f), GUILayout.MaxHeight(140f));
                 for (int i = 0; i < relics.Owned.Count; i++)
                 {
                     var owned = relics.Owned[i];
@@ -663,36 +779,85 @@ namespace Soup.Game
                     GUILayout.Label($"✓ {owned.DisplayName}", BodyLabel(), GUILayout.Width(180f));
                     GUILayout.Label(owned.GetRulesSummary(), BodyLabel(), GUILayout.MinWidth(280f));
                     if (ActionButton("弃", 36f, 28f))
+                    {
                         relics.RemoveOwned(owned);
+                        _lastResult = $"已弃置：{owned.DisplayName}";
+                    }
                     GUILayout.EndHorizontal();
                 }
+                GUILayout.EndScrollView();
             }
 
             GUILayout.Space(6f);
-            GUILayout.Label($"可选（{RelicItem.StageLabel(_debugStage)}）", BoldLabel());
-            var stageRelics = relics.GetRelicsForStage(_debugStage);
-            if (stageRelics.Count == 0)
-                GUILayout.Label("该来源暂无遗物。请在「Soup/遗物管理器」填充正式遗物。", BodyLabel());
-            else
+            var stageRelics = relics.GetRelicsForDebug(_debugStageFilter);
+            int shown = 0;
+            for (int i = 0; i < stageRelics.Count; i++)
             {
-                for (int i = 0; i < stageRelics.Count; i++)
-                {
-                    var item = stageRelics[i];
-                    if (item == null) continue;
-                    int stacks = relics.CountOwned(item);
-                    GUILayout.BeginHorizontal();
-                    GUILayout.Label($"{item.DisplayName}", BodyLabel(), GUILayout.Width(180f));
-                    if (ActionButton(stacks > 0 ? $"再获取({stacks})" : "获取", 100f, 28f))
-                    {
-                        if (relics.Acquire(item))
-                            _lastResult = $"获得遗物：{item.DisplayName}";
-                    }
-                    GUILayout.Label(item.Description, BodyLabel(), GUILayout.MinWidth(200f));
-                    GUILayout.EndHorizontal();
-                }
+                if (MatchesRelicSearch(stageRelics[i]))
+                    shown++;
             }
 
-            GUILayout.EndScrollView();
+            GUILayout.Label($"可选获取（{stageLabel} · {shown}/{stageRelics.Count}）", BoldLabel());
+            if (stageRelics.Count == 0)
+            {
+                GUILayout.Label("该筛选暂无遗物。请执行「Soup/Relic Manager/Seed All Relics」。", BodyLabel());
+                return;
+            }
+
+            // 不用大块内层 ScrollView：嵌套滚动会导致列表底部遗物滚不到、像「没同步」。
+            for (int i = 0; i < stageRelics.Count; i++)
+            {
+                var item = stageRelics[i];
+                if (item == null || !MatchesRelicSearch(item)) continue;
+                int stacks = relics.CountOwned(item);
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(item.DisplayName, BodyLabel(), GUILayout.Width(150f));
+                GUILayout.Label(RelicItem.StageLabel(item.AcquireStage), BodyLabel(), GUILayout.Width(100f));
+                if (ActionButton(stacks > 0 ? $"再获取({stacks})" : "获取", 100f, 28f))
+                {
+                    if (relics.Acquire(item))
+                        _lastResult = $"获得遗物：{item.DisplayName}";
+                }
+                GUILayout.Label(item.Description, BodyLabel(), GUILayout.MinWidth(200f));
+                GUILayout.EndHorizontal();
+            }
+        }
+
+        private void CycleDebugRelicStageFilter()
+        {
+            if (!_debugStageFilter.HasValue)
+            {
+                _debugStageFilter = RelicAcquireStage.Shop;
+                return;
+            }
+
+            if (_debugStageFilter.Value == RelicAcquireStage.Shop)
+            {
+                _debugStageFilter = RelicAcquireStage.Event;
+                return;
+            }
+
+            if (_debugStageFilter.Value == RelicAcquireStage.Event)
+            {
+                _debugStageFilter = RelicAcquireStage.Starting;
+                return;
+            }
+
+            _debugStageFilter = null;
+        }
+
+        private bool MatchesRelicSearch(RelicItem item)
+        {
+            if (item == null) return false;
+            string q = (_relicSearch ?? string.Empty).Trim();
+            if (q.Length == 0) return true;
+            if (!string.IsNullOrEmpty(item.DisplayName)
+                && item.DisplayName.IndexOf(q, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+            if (!string.IsNullOrEmpty(item.Id)
+                && item.Id.IndexOf(q, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+            return false;
         }
 
         private void DrawJobProgressionPanel()

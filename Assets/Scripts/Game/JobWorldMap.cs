@@ -109,7 +109,9 @@ namespace Soup.Game
 
         private void Start()
         {
+            cookZone?.RefreshCameraFraming();
             RebuildStations();
+            cookZone?.Refresh();
         }
 
         private void Update()
@@ -792,8 +794,7 @@ namespace Soup.Game
                     DestroyImmediate(existing.gameObject);
             }
 
-            var art = GameArtLibrary.Load();
-            Sprite sprite = art != null ? art.DividerVertical : null;
+            Sprite sprite = ResolveVerticalDividerSprite();
             if (sprite == null) return;
 
             float spacing = cameraController != null ? cameraController.ZoneSpacing : 22f;
@@ -811,13 +812,33 @@ namespace Soup.Game
                 height = processZone.Background.bounds.size.y;
                 centerY = processZone.Background.bounds.center.y;
             }
+            else if (cookZone != null && cookZone.Background != null)
+            {
+                height = cookZone.Background.bounds.size.y;
+                centerY = cookZone.Background.bounds.center.y;
+            }
 
             var root = new GameObject("ZoneDividers").transform;
             root.SetParent(_root, false);
 
             // Shared edges Gather|Process and Process|Cook (zones abut edge-to-edge).
+            // Divider is centered on the seam so each adjacent view sees about half of it.
             PlaceZoneDivider(root, sprite, new Vector3(-spacing * 0.5f, centerY, -0.05f), height);
             PlaceZoneDivider(root, sprite, new Vector3(spacing * 0.5f, centerY, -0.05f), height);
+        }
+
+        private static Sprite ResolveVerticalDividerSprite()
+        {
+            var art = GameArtLibrary.Load();
+            if (art != null && art.DividerVertical != null)
+                return art.DividerVertical;
+
+            // Fallback if Art Library was not rebound after asset moves.
+            var tex = Resources.Load<Texture2D>("UI/divider2");
+            if (tex != null)
+                return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+
+            return null;
         }
 
         private static void PlaceZoneDivider(Transform parent, Sprite sprite, Vector3 worldPos, float targetHeight)
@@ -828,7 +849,7 @@ namespace Soup.Game
 
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = sprite;
-            sr.sortingOrder = 25;
+            sr.sortingOrder = 40;
             sr.color = Color.white;
 
             Vector2 native = sprite.bounds.size;

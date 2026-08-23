@@ -17,8 +17,8 @@ namespace Soup.Game
         [SerializeField, Min(0)] private int warehouseCapacity = 2000;
 
         [Header("热辣")]
-        [Tooltip("热辣对烹饪分的倍率上限。遗物可解除上限。")]
-        [SerializeField, Min(0f)] private float spicyMultiplierCap = 3f;
+        [Tooltip("热辣对烹饪分的倍率上限。0 = 不限制；>0 时封顶（遗物「无辣不欢」可无视上限）。")]
+        [SerializeField, Min(0f)] private float spicyMultiplierCap = 0f;
 
         [Header("事件")]
         [Tooltip("关卡通关后是否弹出事件（每关固定抽取数量）。")]
@@ -32,6 +32,10 @@ namespace Soup.Game
         [Tooltip("一定回合数内最多出现一次事件：两次随机事件至少间隔这么多回合。1 = 每回合都可判定。")]
         [SerializeField, Min(1)] private int eventCooldownTurns = 3;
 
+        [Header("商店")]
+        [Tooltip("商店开启间隔（关）。2 = 第 2、4、6… 关通关后的关卡间开启。")]
+        [SerializeField, Min(1)] private int shopIntervalLevels = 2;
+
         public int StartingElfCount => startingElfCount;
         public int WarehouseCapacity => warehouseCapacity;
         public float SpicyMultiplierCap => spicyMultiplierCap;
@@ -40,6 +44,13 @@ namespace Soup.Game
         public bool EnableTurnEndEvents => enableTurnEndEvents;
         public float TurnEndEventChance => turnEndEventChance;
         public int EventCooldownTurns => eventCooldownTurns;
+        public int ShopIntervalLevels => shopIntervalLevels;
+
+        /// <summary>已通关数（含本关，从 1 起）是否为商店开启关。</summary>
+        public bool IsShopLevel(int levelsClearedIncludingThis) =>
+            levelsClearedIncludingThis > 0
+            && shopIntervalLevels > 0
+            && levelsClearedIncludingThis % shopIntervalLevels == 0;
 
         public void SetStartingElfCount(int value) => startingElfCount = Mathf.Max(0, value);
 
@@ -57,6 +68,8 @@ namespace Soup.Game
 
         public void SetEventCooldownTurns(int value) => eventCooldownTurns = Mathf.Max(1, value);
 
+        public void SetShopIntervalLevels(int value) => shopIntervalLevels = Mathf.Max(1, value);
+
 #if UNITY_EDITOR
         private void OnValidate()
         {
@@ -66,6 +79,7 @@ namespace Soup.Game
             stageEndEventCount = Mathf.Max(0, stageEndEventCount);
             turnEndEventChance = Mathf.Clamp01(turnEndEventChance);
             eventCooldownTurns = Mathf.Max(1, eventCooldownTurns);
+            shopIntervalLevels = Mathf.Max(1, shopIntervalLevels);
         }
 #endif
     }

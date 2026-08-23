@@ -416,21 +416,15 @@ namespace Soup.Game.Editor
 
         private static void RelocateSystemButtons(Transform overlayRoot)
         {
-            var settings = FindNamed(overlayRoot, "SettingsBtn");
-            var panel = FindNamed(overlayRoot, "ControlPanelBtn");
-            MoveBottomLeft(settings, new Vector2(24f, 24f));
-            MoveBottomLeft(panel, new Vector2(180f, 24f));
+            HideHudButton(overlayRoot, "SettingsBtn");
+            HideHudButton(overlayRoot, "ControlPanelBtn");
         }
 
-        private static void MoveBottomLeft(Transform tf, Vector2 pos)
+        private static void HideHudButton(Transform root, string name)
         {
-            if (tf == null) return;
-            var rt = tf.GetComponent<RectTransform>();
-            if (rt == null) return;
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.zero;
-            rt.pivot = Vector2.zero;
-            rt.anchoredPosition = pos;
+            var tf = FindNamed(root, name);
+            if (tf != null)
+                tf.gameObject.SetActive(false);
         }
 
         private static Transform FindNamed(Transform root, string name)

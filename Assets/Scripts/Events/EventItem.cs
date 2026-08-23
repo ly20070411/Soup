@@ -21,7 +21,8 @@ namespace Soup.Events
         [SerializeField] private EventCategory category = EventCategory.General;
         [SerializeField] private EventTriggerMoment triggerMoment = EventTriggerMoment.AfterStage;
         [SerializeField] [Min(0f)] private float weight = 1f;
-        [SerializeField] private bool canRepeat = true;
+        [Tooltip("预留：跨大关是否可再出现。当前运行时在本大关（整局五关）内所有事件均不重复。")]
+        [SerializeField] private bool canRepeat = false;
         [Tooltip("0 = 任意关；>0 时仅在该关通关后进入抽取池（对应 LevelManager.LevelsClearedCount）。")]
         [SerializeField] [Min(0)] private int requiredStageIndex;
         [Tooltip("互斥组：触发过同组任一事件后，组内其余事件不再出现（如祝福女神）。")]

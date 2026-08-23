@@ -4,6 +4,7 @@ using System.IO;
 using Soup.Employees;
 using Soup.Items;
 using Soup.Jobs;
+using Soup.Relics;
 using UnityEditor;
 using UnityEngine;
 
@@ -16,8 +17,11 @@ namespace Soup.Game.Editor
     public static class ArtAssetBinder
     {
         private const string ArtFolder = "Assets/美术资产/图片";
+        private const string RelicArtFolder = "Assets/美术资产/图片/遗物";
         private const string TitleButtonFolder = "Assets/美术资产/UI/UI/UI";
+        private const string EventIllustrationFolder = "Assets/美术资产/图片/事件";
         private const string LibraryPath = "Assets/Resources/GameArtLibrary.asset";
+        private const string EventIllustrationLibraryPath = "Assets/Resources/EventIllustrationLibrary.asset";
 
         /// <summary>Corner / edge pixels with alpha above this are treated as possibly solid background.</summary>
         private const float OpaqueCornerAlpha = 0.5f;
@@ -31,10 +35,21 @@ namespace Soup.Game.Editor
             EnsureSprites();
             int jobs = BindJobsAndIngredients();
             int emps = BindEmployees();
+            int relics = BindRelics();
             bool libOk = BindUiLibrary();
+            int eventArt = BindEventIllustrations();
             AssetDatabase.SaveAssets();
             Debug.Log(
-                $"[ArtAssetBinder] 完成：去背景 {cleared}，岗位/食材图标 {jobs}，员工 {emps}，UI库 {(libOk ? "OK" : "FAIL")}");
+                $"[ArtAssetBinder] 完成：去背景 {cleared}，岗位/食材图标 {jobs}，员工 {emps}，遗物 {relics}，事件插画 {eventArt}，UI库 {(libOk ? "OK" : "FAIL")}");
+        }
+
+        [MenuItem("Soup/Art/Bind Relic Icons")]
+        public static void BindRelicIconsMenu()
+        {
+            EnsureRelicSprites();
+            int relics = BindRelics();
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[ArtAssetBinder] 遗物图标绑定完成：{relics} 个。");
         }
 
         [MenuItem("Soup/Art/Remove Opaque Backgrounds")]
@@ -61,19 +76,32 @@ namespace Soup.Game.Editor
             int cleared = 0;
             foreach (var file in Directory.GetFiles(ArtFolder, "*.png"))
             {
-                var path = file.Replace('\\', '/');
-                string fileName = Path.GetFileName(path);
-                if (IsUiChromeFile(fileName))
-                    continue;
-
-                if (TryRemoveOpaqueBackground(path))
+                if (TryRemoveOpaqueBackgroundAt(file.Replace('\\', '/')))
                     cleared++;
+            }
+
+            if (Directory.Exists(RelicArtFolder))
+            {
+                foreach (var file in Directory.GetFiles(RelicArtFolder, "*.png"))
+                {
+                    if (TryRemoveOpaqueBackgroundAt(file.Replace('\\', '/')))
+                        cleared++;
+                }
             }
 
             if (cleared > 0)
                 AssetDatabase.Refresh();
 
             return cleared;
+        }
+
+        private static bool TryRemoveOpaqueBackgroundAt(string path)
+        {
+            string fileName = Path.GetFileName(path);
+            if (IsUiChromeFile(fileName))
+                return false;
+
+            return TryRemoveOpaqueBackground(path);
         }
 
         private static bool TryRemoveOpaqueBackground(string assetPath)
@@ -85,7 +113,7 @@ namespace Soup.Game.Editor
             var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
             if (!tex.LoadImage(bytes))
             {
-                Object.DestroyImmediate(tex);
+                UnityEngine.Object.DestroyImmediate(tex);
                 return false;
             }
 
@@ -93,7 +121,7 @@ namespace Soup.Game.Editor
             int h = tex.height;
             if (w < 2 || h < 2)
             {
-                Object.DestroyImmediate(tex);
+                UnityEngine.Object.DestroyImmediate(tex);
                 return false;
             }
 
@@ -106,13 +134,13 @@ namespace Soup.Game.Editor
             float avgA = (c00.a + c10.a + c01.a + c11.a) * (1f / 4f) / 255f;
             if (avgA < OpaqueCornerAlpha)
             {
-                Object.DestroyImmediate(tex);
+                UnityEngine.Object.DestroyImmediate(tex);
                 return false;
             }
 
             if (!CornersMatch(c00, c10, c01, c11, BackgroundColorTolerance))
             {
-                Object.DestroyImmediate(tex);
+                UnityEngine.Object.DestroyImmediate(tex);
                 Debug.LogWarning($"[ArtAssetBinder] 跳过（四角颜色不一致）：{Path.GetFileName(assetPath)}");
                 return false;
             }
@@ -123,14 +151,14 @@ namespace Soup.Game.Editor
 
             if (removed <= 0)
             {
-                Object.DestroyImmediate(tex);
+                UnityEngine.Object.DestroyImmediate(tex);
                 return false;
             }
 
             tex.SetPixels32(pixels);
             tex.Apply(false, false);
             byte[] png = tex.EncodeToPNG();
-            Object.DestroyImmediate(tex);
+            UnityEngine.Object.DestroyImmediate(tex);
             if (png == null || png.Length == 0)
                 return false;
 
@@ -289,9 +317,23 @@ namespace Soup.Game.Editor
             foreach (var file in Directory.GetFiles(ArtFolder, "*.png"))
                 EnsureSpriteFile(file.Replace('\\', '/'));
 
+            EnsureRelicSprites();
+
             EnsureSpriteFile($"{TitleButtonFolder}/按钮1.png");
             EnsureSpriteFile($"{TitleButtonFolder}/按钮2.png");
             EnsureSpriteFile($"{TitleButtonFolder}/按钮3.png");
+        }
+
+        private static void EnsureRelicSprites()
+        {
+            if (!Directory.Exists(RelicArtFolder))
+            {
+                Debug.LogWarning($"[ArtAssetBinder] 找不到遗物目录：{RelicArtFolder}");
+                return;
+            }
+
+            foreach (var file in Directory.GetFiles(RelicArtFolder, "*.png"))
+                EnsureSpriteFile(file.Replace('\\', '/'));
         }
 
         private static void EnsureSpriteFile(string path)
@@ -419,10 +461,20 @@ namespace Soup.Game.Editor
                    || fileName == "鲜美.png";
         }
 
-        /// <summary>Scene props authored at PPU 100 (not 1-unit job icons).</summary>
+        /// <summary>
+        /// Scene / panel art that must stay at PPU 100 + full res.
+        /// Top-level files under 图片/ are otherwise treated as 1-unit icons
+        /// (PPU = source max edge), which repeatedly shrinks zone backdrops
+        /// like 烹饪 (1).png whenever Bind Art Assets runs.
+        /// </summary>
         private static bool IsWorldPropFile(string fileName)
         {
-            return fileName == "仓库.png";
+            if (string.IsNullOrEmpty(fileName)) return false;
+            if (fileName == "仓库.png") return true;
+            if (fileName.StartsWith("烹饪")) return true;
+            if (fileName.StartsWith("商店")) return true;
+            if (fileName == "事件按钮.png" || fileName == "羊皮.png") return true;
+            return false;
         }
 
         private static Vector4 GetUiChromeBorder(string fileName)
@@ -605,6 +657,57 @@ namespace Soup.Game.Editor
             return hits;
         }
 
+        /// <summary>
+        /// 美术文件名为遗物 displayName（如 激励.png → 激励）。
+        /// 导入为 512 内图标，与岗位/食材一致，HUD 44×44 槽 preserveAspect 显示。
+        /// </summary>
+        private static int BindRelics()
+        {
+            if (!Directory.Exists(RelicArtFolder))
+            {
+                Debug.LogWarning($"[ArtAssetBinder] 找不到遗物目录：{RelicArtFolder}");
+                return 0;
+            }
+
+            var byDisplayName = new Dictionary<string, Sprite>();
+            foreach (var file in Directory.GetFiles(RelicArtFolder, "*.png"))
+            {
+                var path = file.Replace('\\', '/');
+                var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                if (sprite == null)
+                {
+                    Debug.LogWarning($"[ArtAssetBinder] 无法加载遗物 Sprite：{path}");
+                    continue;
+                }
+
+                string name = Path.GetFileNameWithoutExtension(path);
+                byDisplayName[name] = sprite;
+            }
+
+            if (byDisplayName.Count == 0)
+                return 0;
+
+            int hits = 0;
+            foreach (var guid in AssetDatabase.FindAssets("t:RelicItem"))
+            {
+                var relic = AssetDatabase.LoadAssetAtPath<RelicItem>(AssetDatabase.GUIDToAssetPath(guid));
+                if (relic == null) continue;
+
+                if (string.IsNullOrEmpty(relic.DisplayName)
+                    || !byDisplayName.TryGetValue(relic.DisplayName, out var sprite))
+                {
+                    Debug.LogWarning($"[ArtAssetBinder] 遗物缺少图片：{relic.Id} / {relic.DisplayName}");
+                    continue;
+                }
+
+                relic.SetIcon(sprite);
+                EditorUtility.SetDirty(relic);
+                hits++;
+            }
+
+            return hits;
+        }
+
         private static bool BindUiLibrary()
         {
             if (!AssetDatabase.IsValidFolder("Assets/Resources"))
@@ -637,6 +740,12 @@ namespace Soup.Game.Editor
                 LoadUi("按钮1.png"),
                 LoadUi("按钮2.png"),
                 LoadUi("按钮3.png"));
+            lib.SetShopArt(
+                Load("商店背景.png"),
+                Load("商店小猫（立绘）.png"));
+            lib.SetEventPanelBackground(Load("羊皮.png"));
+            lib.SetEventIllustrationFrame(LoadUi("事件外框.png"));
+            lib.SetVictorySettlementBackground(Load("通关画面.png"));
             EditorUtility.SetDirty(lib);
             return lib.ZoneSwitchLeft != null
                    && lib.ZoneSwitchRight != null
@@ -656,8 +765,64 @@ namespace Soup.Game.Editor
                    && lib.TitleBackground != null
                    && lib.TitleStartButton != null
                    && lib.TitleContinueButton != null
-                   && lib.TitleQuitButton != null;
+                   && lib.TitleQuitButton != null
+                   && lib.ShopBackground != null
+                   && lib.ShopCatPortrait != null
+                   && lib.EventPanelBackground != null
+                   && lib.EventIllustrationFrame != null;
         }
+
+        private static int BindEventIllustrations()
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/Resources"))
+                AssetDatabase.CreateFolder("Assets", "Resources");
+
+            var lib = AssetDatabase.LoadAssetAtPath<EventIllustrationLibrary>(EventIllustrationLibraryPath);
+            if (lib == null)
+            {
+                lib = ScriptableObject.CreateInstance<EventIllustrationLibrary>();
+                AssetDatabase.CreateAsset(lib, EventIllustrationLibraryPath);
+            }
+
+            var entries = new List<EventIllustrationLibrary.Entry>();
+            int hits = 0;
+
+            foreach (var pair in EventIllustrationFileMap)
+            {
+                var sprite = LoadEventArt(pair.fileName);
+                if (sprite == null) continue;
+                entries.Add(new EventIllustrationLibrary.Entry { eventId = pair.eventId, sprite = sprite });
+                hits++;
+            }
+
+            lib.SetEntries(entries);
+            EditorUtility.SetDirty(lib);
+            return hits;
+        }
+
+        private static Sprite LoadEventArt(string fileName)
+        {
+            return AssetDatabase.LoadAssetAtPath<Sprite>($"{EventIllustrationFolder}/{fileName}");
+        }
+
+        /// <summary>美术文件名 → 事件 id（与 EventDataSeeder 一致）。</summary>
+        private static readonly (string fileName, string eventId)[] EventIllustrationFileMap =
+        {
+            ("祝福女神1.png", "blessing_goddess_1"),
+            ("祝福女神2.png", "blessing_goddess_2"),
+            ("祝福女神3.png", "blessing_goddess_3"),
+            ("凑企鹅.png", "penguin_gather"),
+            ("！苔藓！.png", "moss_everywhere"),
+            ("闹鬼.png", "haunted"),
+            ("神秘墓穴.png", "mysterious_tomb"),
+            ("更美味的汤.png", "tastier_soup"),
+            ("风味盐.png", "flavor_salt"),
+            ("更多人手？.png", "more_hands"),
+            ("异世界勇者.png", "otherworld_hero"),
+            ("异世界冒险队.png", "otherworld_hero"),
+            ("索嗨.png", "suohai"),
+            ("这是小精灵首次同时对战两只怪兽.png", "two_monsters"),
+        };
     }
 }
 #endif

@@ -24,6 +24,8 @@ namespace Soup.Game
         private Collider2D _minusHit;
         private Collider2D _plusHit;
         private Collider2D _warningHit;
+        private Transform _clearButton;
+        private Collider2D _clearHit;
         private ProcessZoneView _zone;
 
         public int SlotIndex => slotIndex;
@@ -53,6 +55,7 @@ namespace Soup.Game
             bool show = visible && IsUnlocked && !AdvancementVisit.IsActive;
             if (minusButton != null) minusButton.gameObject.SetActive(show);
             if (plusButton != null) plusButton.gameObject.SetActive(show);
+            StationAssignClearPad.SetActive(_clearButton, show);
             if (countFrame != null) countFrame.gameObject.SetActive(IsUnlocked);
             if (countMesh != null) countMesh.gameObject.SetActive(IsUnlocked);
         }
@@ -85,6 +88,12 @@ namespace Soup.Game
                 return;
 
             if (hit == null) return;
+            if (StationAssignClearPad.IsHit(hit, _clearButton, _clearHit))
+            {
+                TryClearAll();
+                return;
+            }
+
             if (hit == _plusHit || hit.transform == plusButton || hit.name.Contains("切换键右") || hit.name.Contains("Plus"))
                 TryChange(+1);
             else if (hit == _minusHit || hit.transform == minusButton || hit.name.Contains("切换键左") || hit.name.Contains("Minus"))
@@ -111,6 +120,12 @@ namespace Soup.Game
                     TryChange(-1);
                     return true;
                 }
+
+                if (StationAssignClearPad.IsHit(h, _clearButton, _clearHit))
+                {
+                    TryClearAll();
+                    return true;
+                }
             }
 
             return false;
@@ -121,6 +136,16 @@ namespace Soup.Game
             if (hit == null) return false;
             if (hit == _warningHit) return true;
             return warningSign != null && hit.transform.IsChildOf(warningSign.transform);
+        }
+
+        private void TryClearAll()
+        {
+            var em = EmployeeManager.Instance;
+            if (em == null || _job == null) return;
+            if (!em.TryClearJobAssignments(_job)) return;
+            RefreshCount();
+            ResolveZone()?.Refresh();
+            FindObjectOfType<CookZoneView>()?.Refresh();
         }
 
         private void TryChange(int delta)
@@ -134,6 +159,7 @@ namespace Soup.Game
                 em.TryUnassign(assignType, _job, 1);
             RefreshCount();
             ResolveZone()?.Refresh();
+            FindObjectOfType<CookZoneView>()?.Refresh();
         }
 
         private ProcessZoneView ResolveZone()
@@ -172,6 +198,7 @@ namespace Soup.Game
                 minusButton.gameObject.SetActive(showPads && IsUnlocked);
             if (plusButton != null)
                 plusButton.gameObject.SetActive(showPads && IsUnlocked);
+            StationAssignClearPad.SetActive(_clearButton, showPads && IsUnlocked);
             if (countFrame != null)
                 countFrame.gameObject.SetActive(IsUnlocked);
             if (countMesh != null)
@@ -255,6 +282,9 @@ namespace Soup.Game
                 countMesh.transform.SetParent(countFrame.transform, false);
                 countMesh.transform.localPosition = new Vector3(0f, 0f, -0.02f);
             }
+
+            StationAssignClearPad.LayoutBelowControls(
+                _clearButton, minusButton, plusButton, countFrame);
         }
 
         private static void CopyLossyScale(Transform target, Transform source)
@@ -296,6 +326,8 @@ namespace Soup.Game
 
             _minusHit = EnsureButtonCollider(minusButton);
             _plusHit = EnsureButtonCollider(plusButton);
+            int sorting = countFrame != null ? countFrame.sortingOrder + 4 : 32;
+            _clearHit = StationAssignClearPad.Ensure(ref _clearButton, transform, sorting);
         }
 
         private static Collider2D EnsureButtonCollider(Transform button)

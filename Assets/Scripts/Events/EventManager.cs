@@ -8,8 +8,9 @@ using UnityEngine;
 namespace Soup.Events
 {
     /// <summary>
-    /// Runtime event catalog and pending choice queue.
-    /// Stage settle presents 2 events (一般 + optional 进阶专属 with job-upgrade gate).
+    /// 运行时事件目录与待选队列。
+    /// 关卡通关后抽取通关事件（默认 2 个，至多 1 个进阶专属）。
+    /// 已触发事件在本大关（整局战役，含全部关卡如五关）内不重复；仅新开一局时清空。
     /// </summary>
     [DefaultExecutionOrder(-95)]
     public class EventManager : MonoBehaviour
@@ -24,6 +25,7 @@ namespace Soup.Events
         [SerializeField] private GameConfig config;
         [SerializeField] private bool dontDestroyOnLoad = true;
 
+        /// <summary>本大关内已触发过的事件 id（跨关卡累计，进下一关不清空）。</summary>
         private readonly List<string> _seenEventIds = new List<string>();
         private readonly Queue<EventItem> _pendingQueue = new Queue<EventItem>();
         private EventItem _pendingEvent;
@@ -155,11 +157,17 @@ namespace Soup.Events
 
         public void ResetRun()
         {
-            _seenEventIds.Clear();
+            ClearSeenEventsForMajorStage();
             _lastRandomEventTurn = 0;
             _pendingQueue.Clear();
             _stageEventBatchActive = false;
             ClearPending(notify: true);
+        }
+
+        /// <summary>新大关 / 新开一局：清空已触发事件（关卡切换时勿调用）。</summary>
+        public void ClearSeenEventsForMajorStage()
+        {
+            _seenEventIds.Clear();
         }
 
         public void ApplyState(IList<string> seenEventIds, int lastRandomEventTurn = 0)
@@ -209,6 +217,9 @@ namespace Soup.Events
         public bool Present(EventItem eventItem, bool countAsRandomTurnEvent = false)
         {
             if (eventItem == null) return false;
+            if (!CanScheduleEvent(eventItem))
+                return false;
+
             if (HasPendingEvent)
             {
                 _pendingQueue.Enqueue(eventItem);
@@ -219,6 +230,20 @@ namespace Soup.Events
         }
 
         public bool PresentById(string id) => Present(GetById(id));
+
+        /// <summary>调试：强制弹出指定事件（忽略已触发 / 互斥限制，不计入回合随机冷却）。</summary>
+        public bool PresentForDebug(EventItem eventItem)
+        {
+            if (eventItem == null) return false;
+            if (HasPendingEvent)
+                return false;
+
+            _pendingQueue.Clear();
+            _stageEventBatchActive = false;
+            return PresentImmediate(eventItem, countAsRandomTurnEvent: false);
+        }
+
+        public bool PresentForDebugById(string id) => PresentForDebug(GetById(id));
 
         /// <summary>
         /// 关卡通关后：抽取至多 <see cref="StageEndEventCount"/> 个事件（至多一个进阶专属），
@@ -245,11 +270,59 @@ namespace Soup.Events
             }
 
             _stageEventBatchActive = true;
+            int enqueued = 0;
             for (int i = 0; i < picks.Count; i++)
-                _pendingQueue.Enqueue(picks[i]);
+            {
+                var pick = picks[i];
+                if (pick == null || !CanScheduleEvent(pick))
+                    continue;
+                _pendingQueue.Enqueue(pick);
+                enqueued++;
+            }
+
+            if (enqueued <= 0 && !HasPendingEvent)
+            {
+                _stageEventBatchActive = false;
+                NotifyStageEventBatchCompleted();
+                return 0;
+            }
 
             TryPresentNextFromQueue();
-            return picks.Count;
+            return enqueued;
+        }
+
+        /// <summary>
+        /// 立刻抽取并弹出若干通关事件（遗物「三个问号按钮」等）。
+        /// 可与进行中的事件批次叠加入队，但不会重复入队同一事件或互斥组。
+        /// </summary>
+        public int PresentBonusStageEvents(int count)
+        {
+            if (count <= 0 || database == null || database.Count == 0)
+                return 0;
+
+            var picks = PickStageEventPair(count);
+            if (picks.Count == 0)
+                return 0;
+
+            _stageEventBatchActive = true;
+            int enqueued = 0;
+            for (int i = 0; i < picks.Count; i++)
+            {
+                var pick = picks[i];
+                if (pick == null || !CanScheduleEvent(pick))
+                    continue;
+                _pendingQueue.Enqueue(pick);
+                enqueued++;
+            }
+
+            if (enqueued <= 0 && !HasPendingEvent)
+            {
+                _stageEventBatchActive = false;
+                return 0;
+            }
+
+            TryPresentNextFromQueue();
+            return enqueued;
         }
 
         /// <summary>
@@ -303,9 +376,9 @@ namespace Soup.Events
             }
 
             var resolved = _pendingEvent;
-            EventEffectRunner.Apply(option);
-
+            // 先记入已触发，避免选项内获得遗物（如三个问号）再次抽到本事件。
             MarkEventResolved(resolved);
+            EventEffectRunner.Apply(option);
 
             _pendingEvent = null;
             EventResolved?.Invoke(resolved, optionIndex);
@@ -322,7 +395,7 @@ namespace Soup.Events
         {
             if (resolved == null) return;
 
-            if (!resolved.CanRepeat && !_seenEventIds.Contains(resolved.Id))
+            if (!_seenEventIds.Contains(resolved.Id))
                 _seenEventIds.Add(resolved.Id);
 
             MarkExclusionGroupSeen(resolved.ExclusionGroup);
@@ -376,7 +449,7 @@ namespace Soup.Events
 
         private bool PresentImmediate(EventItem eventItem, bool countAsRandomTurnEvent)
         {
-            if (eventItem == null) return false;
+            if (eventItem == null || !CanScheduleEvent(eventItem)) return false;
 
             _pendingEvent = eventItem;
             if (countAsRandomTurnEvent)
@@ -396,6 +469,8 @@ namespace Soup.Events
             {
                 var next = _pendingQueue.Dequeue();
                 if (next == null) continue;
+                if (!CanScheduleEvent(next))
+                    continue;
                 return PresentImmediate(next, countAsRandomTurnEvent: false);
             }
 
@@ -410,6 +485,7 @@ namespace Soup.Events
         {
             var result = new List<EventItem>(count);
             var exclude = new HashSet<EventItem>();
+            var excludeIds = new HashSet<string>();
             bool pickedAdvanced = false;
 
             for (int n = 0; n < count; n++)
@@ -418,13 +494,16 @@ namespace Soup.Events
                     EventTriggerMoment.AfterStage,
                     excludeAdvancedIfAnyPicked: true,
                     alreadyPickedAdvanced: pickedAdvanced,
-                    exclude: exclude);
+                    exclude: exclude,
+                    excludeIds: excludeIds);
 
                 if (pick == null)
                     break;
 
                 result.Add(pick);
                 exclude.Add(pick);
+                if (!string.IsNullOrEmpty(pick.Id))
+                    excludeIds.Add(pick.Id);
                 if (pick.IsAdvancedExclusive)
                     pickedAdvanced = true;
             }
@@ -436,7 +515,8 @@ namespace Soup.Events
             EventTriggerMoment moment,
             bool excludeAdvancedIfAnyPicked,
             bool alreadyPickedAdvanced,
-            HashSet<EventItem> exclude)
+            HashSet<EventItem> exclude,
+            HashSet<string> excludeIds = null)
         {
             if (database == null) return null;
 
@@ -445,7 +525,7 @@ namespace Soup.Events
             for (int i = 0; i < pool.Count; i++)
             {
                 var item = pool[i];
-                if (!IsEligibleForPick(item, excludeAdvancedIfAnyPicked, alreadyPickedAdvanced, exclude))
+                if (!IsEligibleForPick(item, excludeAdvancedIfAnyPicked, alreadyPickedAdvanced, exclude, excludeIds))
                     continue;
                 total += GetEffectiveWeight(item);
             }
@@ -457,7 +537,7 @@ namespace Soup.Events
             for (int i = 0; i < pool.Count; i++)
             {
                 var item = pool[i];
-                if (!IsEligibleForPick(item, excludeAdvancedIfAnyPicked, alreadyPickedAdvanced, exclude))
+                if (!IsEligibleForPick(item, excludeAdvancedIfAnyPicked, alreadyPickedAdvanced, exclude, excludeIds))
                     continue;
                 cursor += GetEffectiveWeight(item);
                 if (roll <= cursor)
@@ -466,7 +546,7 @@ namespace Soup.Events
 
             for (int i = pool.Count - 1; i >= 0; i--)
             {
-                if (IsEligibleForPick(pool[i], excludeAdvancedIfAnyPicked, alreadyPickedAdvanced, exclude))
+                if (IsEligibleForPick(pool[i], excludeAdvancedIfAnyPicked, alreadyPickedAdvanced, exclude, excludeIds))
                     return pool[i];
             }
 
@@ -486,10 +566,17 @@ namespace Soup.Events
             EventItem item,
             bool excludeAdvancedIfAnyPicked,
             bool alreadyPickedAdvanced,
-            HashSet<EventItem> exclude)
+            HashSet<EventItem> exclude,
+            HashSet<string> excludeIds = null)
         {
             if (!IsEligibleBase(item)) return false;
             if (exclude != null && exclude.Contains(item)) return false;
+            if (excludeIds != null
+                && !string.IsNullOrEmpty(item.Id)
+                && excludeIds.Contains(item.Id))
+                return false;
+            if (IsExclusionGroupBlockedInBatch(item, exclude))
+                return false;
 
             if (item.IsAdvancedExclusive)
             {
@@ -500,6 +587,27 @@ namespace Soup.Events
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// 同批次抽取时，互斥组内已有候选则不可再抽（入队前尚未写入队列，仅靠 IsExclusionGroupBlocked 拦不住）。
+        /// </summary>
+        private bool IsExclusionGroupBlockedInBatch(EventItem item, HashSet<EventItem> batchPicks)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.ExclusionGroup))
+                return false;
+            if (batchPicks == null || batchPicks.Count == 0)
+                return false;
+
+            string group = item.ExclusionGroup;
+            foreach (var picked in batchPicks)
+            {
+                if (picked != null
+                    && string.Equals(picked.ExclusionGroup, group, StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
         }
 
         private static bool IsAdvancedJobUnlocked(EventItem item)
@@ -517,9 +625,64 @@ namespace Soup.Events
             if (item == null) return false;
             if (item.Options == null || item.Options.Count == 0) return false;
             if (item.Weight <= 0f) return false;
-            if (!item.CanRepeat && _seenEventIds.Contains(item.Id))
+            if (_seenEventIds.Contains(item.Id))
+                return false;
+            if (IsEventIdScheduled(item.Id))
+                return false;
+            if (IsExclusionGroupBlocked(item))
                 return false;
             if (!IsStageRequirementMet(item))
+                return false;
+            return true;
+        }
+
+        /// <summary>同一事件不可同时出现在 pending / 队列中。</summary>
+        private bool IsEventIdScheduled(string eventId)
+        {
+            if (string.IsNullOrWhiteSpace(eventId)) return false;
+            if (_pendingEvent != null && _pendingEvent.Id == eventId)
+                return true;
+
+            foreach (var queued in _pendingQueue)
+            {
+                if (queued != null && queued.Id == eventId)
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>互斥组内任一事件已触发或已在队列中，则整组不可再抽/入队。</summary>
+        private bool IsExclusionGroupBlocked(EventItem item)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.ExclusionGroup))
+                return false;
+            if (database == null || database.Events == null)
+                return false;
+
+            string group = item.ExclusionGroup;
+            var events = database.Events;
+            for (int i = 0; i < events.Count; i++)
+            {
+                var other = events[i];
+                if (other == null || string.IsNullOrEmpty(other.Id)) continue;
+                if (!string.Equals(other.ExclusionGroup, group, System.StringComparison.Ordinal))
+                    continue;
+                if (_seenEventIds.Contains(other.Id) || IsEventIdScheduled(other.Id))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool CanScheduleEvent(EventItem item)
+        {
+            if (item == null) return false;
+            if (IsEventIdScheduled(item.Id))
+                return false;
+            if (IsExclusionGroupBlocked(item))
+                return false;
+            if (_seenEventIds.Contains(item.Id))
                 return false;
             return true;
         }

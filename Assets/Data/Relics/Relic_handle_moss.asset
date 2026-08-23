@@ -14,9 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: handle_moss
   displayName: "\u5904\u7406\u82D4\u85D3"
-  description: "\u6BCF\u91C7\u96C6 1 \u4E2A\u91C7\u96C6\u7269\uFF0C\u83B7\u5F97 1
-    \u4E2A\u67D4\u8F6F\u98DF\u6750\u3002"
-  icon: {fileID: 0}
+  description: "\u6BCF\u91C7\u96C61\u4E2A\u91C7\u96C6\u7269\uFF0C\u83B7\u5F971\u4E2A\u67D4\u8F6F\u98DF\u6750\u3002"
+  icon: {fileID: 21300000, guid: a1901747b29ac6a47b2371f3a3558814, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 0

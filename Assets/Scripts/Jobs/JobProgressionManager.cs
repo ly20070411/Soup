@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Soup.Employees;
 using Soup.Game;
+using Soup.Relics;
 using UnityEngine;
 
 namespace Soup.Jobs
@@ -15,6 +16,8 @@ namespace Soup.Jobs
 
         private readonly HashSet<JobItem> _unlocked = new HashSet<JobItem>();
         private readonly Dictionary<JobItem, JobAdvanceNodeId> _advancePaths = new Dictionary<JobItem, JobAdvanceNodeId>();
+        /// <summary>我爱坨坨：所有采集岗按快乐坨坨结算/展示，进阶节点 id 仍挂在原岗位上。</summary>
+        private bool _gatherJobsActAsHappyTuotuo;
         private readonly Dictionary<JobItem, JobItem> _designatedGatherAuraTargets = new Dictionary<JobItem, JobItem>();
         private readonly List<JobItem> _destroyedGatherJobs = new List<JobItem>();
         private readonly Dictionary<JobItem, float> _pendingGatherEfficiencyPenalty = new Dictionary<JobItem, float>();
@@ -127,6 +130,7 @@ namespace Soup.Jobs
             _endTurnIncentivesGrantedThisLevel = 0;
             _gatherStarterPicked = false;
             _processStarterPicked = false;
+            _gatherJobsActAsHappyTuotuo = false;
             BootstrapDefaults();
         }
 
@@ -143,7 +147,8 @@ namespace Soup.Jobs
             IList<string> pendingEfficiencyPenaltyJobIds = null,
             IList<float> pendingEfficiencyPenaltyValues = null,
             int endTurnIncentivesGrantedThisLevel = 0,
-            IList<JobEventModSave> eventMods = null)
+            IList<JobEventModSave> eventMods = null,
+            bool gatherJobsActAsHappyTuotuo = false)
         {
             _unlocked.Clear();
             _advancePaths.Clear();
@@ -155,6 +160,7 @@ namespace Soup.Jobs
             _endTurnIncentivesGrantedThisLevel = Mathf.Max(0, endTurnIncentivesGrantedThisLevel);
             _gatherStarterPicked = gatherStarterPicked;
             _processStarterPicked = processStarterPicked;
+            _gatherJobsActAsHappyTuotuo = gatherJobsActAsHappyTuotuo;
 
             var jobs = JobManager.Instance;
             if (jobs != null && unlockedJobIds != null)
@@ -257,6 +263,38 @@ namespace Soup.Jobs
             return _advancePaths.TryGetValue(job, out var path) ? path : JobAdvanceNodeId.None;
         }
 
+        public bool GatherJobsActAsHappyTuotuo => _gatherJobsActAsHappyTuotuo;
+
+        /// <summary>
+        /// 采集结算/进阶效果/展示所用的岗位定义。
+        /// 我爱坨坨开启后，非快乐坨坨岗仍保留原解锁键与进阶路径，但读取快乐坨坨的数据树。
+        /// </summary>
+        public JobItem ResolveGatherDefinition(JobItem job)
+        {
+            if (job == null || job.JobType != JobType.Gather) return job;
+            if (!_gatherJobsActAsHappyTuotuo) return job;
+            if (job.Id == JobProgressionRules.HappyTuotuoJobId) return job;
+            var happy = JobManager.Instance != null
+                ? JobManager.Instance.GetById(JobProgressionRules.HappyTuotuoJobId)
+                : null;
+            return happy != null ? happy : job;
+        }
+
+        public bool HasUnlockedHappyTuotuoGather()
+        {
+            var happy = JobManager.Instance != null
+                ? JobManager.Instance.GetById(JobProgressionRules.HappyTuotuoJobId)
+                : null;
+            return happy != null && IsUnlocked(happy) && !IsDestroyedGatherJob(happy);
+        }
+
+        /// <summary>我爱坨坨：全部已有采集岗改为按快乐坨坨运作（进阶分支路径保留）。</summary>
+        public void ConvertAllGatherJobsToHappyTuotuo()
+        {
+            _gatherJobsActAsHappyTuotuo = true;
+            GameFloatingToast.Show("我爱坨坨：所有采集岗变为快乐坨坨（进阶保留）", 3f);
+        }
+
         public JobItem GetDesignatedGatherAuraTarget(JobItem source)
         {
             if (source == null) return null;
@@ -316,6 +354,15 @@ namespace Soup.Jobs
                 jobIds.Add(pair.Key.Id);
                 values.Add(pair.Value);
             }
+        }
+
+        /// <summary>读取该岗待结算的下一回合效率减成（不清除）。</summary>
+        public float PeekPendingGatherEfficiencyPenalty(JobItem job)
+        {
+            if (job == null) return 0f;
+            if (!_pendingGatherEfficiencyPenalty.TryGetValue(job, out float penalty))
+                return 0f;
+            return Mathf.Max(0f, penalty);
         }
 
         /// <summary>读取并清除该岗待结算的下一回合效率减成。</summary>
@@ -440,11 +487,14 @@ namespace Soup.Jobs
         public int GetEffectiveMaxWorkers(JobItem job)
         {
             if (job == null) return 0;
-            if (!job.HasWorkerLimit) return int.MaxValue;
-            int cap = job.GetEffectiveMaxWorkers(GetAdvancePath(job));
+            var def = ResolveGatherDefinition(job);
+            if (def == null) return 0;
+            if (!def.HasWorkerLimit) return int.MaxValue;
+            int cap = def.GetEffectiveMaxWorkers(GetAdvancePath(job));
             var mods = GetEventMods(job);
             if (mods != null)
                 cap += mods.MaxWorkersDelta;
+            cap += RelicEffectRunner.SumAllJobMaxWorkersBonus();
             return Mathf.Max(0, cap);
         }
 
@@ -636,8 +686,9 @@ namespace Soup.Jobs
         {
             if (!JobAdvancePath.IsValidNext(GetAdvancePath(job), choice)) return false;
 
-            job.EnsureAdvanceTreeDefaults();
-            var node = job.GetAdvanceNode(choice);
+            var def = ResolveGatherDefinition(job);
+            def.EnsureAdvanceTreeDefaults();
+            var node = def.GetAdvanceNode(choice);
             if (node != null && node.IsNoneAdvanceNode())
                 return false;
             if (node != null && node.DestroyOtherGatherOnTake && GetDestroyableGatherJobs(job).Count == 0)
@@ -666,22 +717,23 @@ namespace Soup.Jobs
             return true;
         }
 
-        private static void ApplyAdvanceOnTake(JobItem job, JobAdvanceNodeId choice, out JobItem destroyedGather)
+        private void ApplyAdvanceOnTake(JobItem job, JobAdvanceNodeId choice, out JobItem destroyedGather)
         {
             destroyedGather = null;
             if (job == null || choice == JobAdvanceNodeId.None) return;
-            job.EnsureAdvanceTreeDefaults();
-            var node = job.GetAdvanceNode(choice);
+            var def = ResolveGatherDefinition(job);
+            def.EnsureAdvanceTreeDefaults();
+            var node = def.GetAdvanceNode(choice);
             if (node == null) return;
 
             if (node.GrantEmployeeCount > 0 && !string.IsNullOrWhiteSpace(node.GrantEmployeeId))
                 EmployeeManager.Instance?.Add(node.GrantEmployeeId, node.GrantEmployeeCount);
 
             if (node.NeedsDesignatedGatherTarget)
-                Instance?.EnsureDesignatedGatherAuraTarget(job);
+                EnsureDesignatedGatherAuraTarget(job);
 
             if (node.DestroyOtherGatherOnTake)
-                Instance?.TryDestroyRandomOtherGather(job, out destroyedGather);
+                TryDestroyRandomOtherGather(job, out destroyedGather);
         }
 
         private void EnsureDesignatedGatherAuraTarget(JobItem source)
@@ -804,8 +856,9 @@ namespace Soup.Jobs
             if (job == null || nodeId == JobAdvanceNodeId.None)
                 return string.Empty;
 
-            job.EnsureAdvanceTreeDefaults();
-            var node = job.GetAdvanceNode(nodeId);
+            var def = ResolveGatherDefinition(job);
+            def.EnsureAdvanceTreeDefaults();
+            var node = def.GetAdvanceNode(nodeId);
             return node != null ? node.ToSummary(nodeId) : JobAdvancePath.ToLabel(nodeId);
         }
 
@@ -834,7 +887,8 @@ namespace Soup.Jobs
             GetAvailableAdvanceChoices(job, _choiceBuffer);
             if (_choiceBuffer.Count == 0) return "已满级";
 
-            job.EnsureAdvanceTreeDefaults();
+            var def = ResolveGatherDefinition(job);
+            def.EnsureAdvanceTreeDefaults();
             var parts = new List<string>(_choiceBuffer.Count);
             for (int i = 0; i < _choiceBuffer.Count; i++)
                 parts.Add(DescribeNode(job, _choiceBuffer[i]));
@@ -844,8 +898,9 @@ namespace Soup.Jobs
         public string DescribeAdvanceTree(JobItem job)
         {
             if (job == null) return string.Empty;
-            job.EnsureAdvanceTreeDefaults();
-            return job.BuildTreeDiagram(GetAdvancePath(job));
+            var def = ResolveGatherDefinition(job);
+            def.EnsureAdvanceTreeDefaults();
+            return def.BuildTreeDiagram(GetAdvancePath(job));
         }
 
         private JobItem ResolveStartingGatherJob()

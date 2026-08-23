@@ -24,6 +24,9 @@ namespace Soup.Levels
 
         private readonly List<RelicItem> _relicOffers = new List<RelicItem>();
         private readonly List<string> _relicOfferIds = new List<string>();
+        private readonly List<string> _shopOfferIds = new List<string>();
+        private readonly List<string> _gatherUnlockOfferIds = new List<string>();
+        private readonly List<string> _processUnlockOfferIds = new List<string>();
 
         private bool _completedFired;
 
@@ -32,8 +35,11 @@ namespace Soup.Levels
         public bool ElvesClaimed { get; private set; }
         public bool WarehouseClaimed { get; private set; }
         public bool RelicClaimed { get; private set; }
+        public bool ShopClaimed { get; private set; }
         public bool AdvancementClaimed { get; private set; }
         public bool EventsClaimed { get; private set; }
+        /// <summary>玩家是否已通过关卡间「事件」按钮领取本关自带通关事件批次。</summary>
+        public bool StandardStageEventsStarted { get; private set; }
 
         public int GatherCharges { get; private set; }
         public int ProcessCharges { get; private set; }
@@ -67,14 +73,19 @@ namespace Soup.Levels
             ElvesClaimed = false;
             WarehouseClaimed = false;
             RelicClaimed = false;
+            ShopClaimed = false;
             AdvancementClaimed = false;
             EventsClaimed = false;
+            StandardStageEventsStarted = false;
             GatherCharges = 0;
             ProcessCharges = 0;
             CookCharges = 0;
             LevelsClearedAtStart = 0;
             _relicOffers.Clear();
             _relicOfferIds.Clear();
+            _shopOfferIds.Clear();
+            _gatherUnlockOfferIds.Clear();
+            _processUnlockOfferIds.Clear();
         }
 
         /// <param name="levelsClearedIncludingThis">How many levels have been cleared after this win (1-based).</param>
@@ -90,11 +101,28 @@ namespace Soup.Levels
                 out int gather,
                 out int process,
                 out int cook);
-            GatherCharges = gather;
-            ProcessCharges = process;
-            CookCharges = cook;
+            int bonus = RelicEffectRunner.SumExtraAdvanceChargesAllZones();
+            GatherCharges = gather + bonus;
+            ProcessCharges = process + bonus;
+            CookCharges = cook + bonus;
 
             BuildRelicOffers(LevelsClearedAtStart);
+            RaiseChanged();
+        }
+
+        /// <summary>关卡间即时追加进阶次数（如商店购买施工队）。</summary>
+        public void AddAdvanceCharges(int gather, int process, int cook)
+        {
+            if (!IsActive) return;
+            GatherCharges = Mathf.Max(0, GatherCharges + gather);
+            ProcessCharges = Mathf.Max(0, ProcessCharges + process);
+            CookCharges = Mathf.Max(0, CookCharges + cook);
+            if (GatherCharges + ProcessCharges + CookCharges > 0)
+                AdvancementClaimed = false;
+            if (gather > 0)
+                _gatherUnlockOfferIds.Clear();
+            if (process > 0)
+                _processUnlockOfferIds.Clear();
             RaiseChanged();
         }
 
@@ -103,12 +131,17 @@ namespace Soup.Levels
             bool elvesClaimed,
             bool warehouseClaimed,
             bool relicClaimed,
+            bool shopClaimed,
             bool advancementClaimed,
             bool eventsClaimed,
+            bool standardStageEventsStarted,
             int gatherCharges,
             int processCharges,
             int cookCharges,
-            IList<string> relicOfferIds)
+            IList<string> relicOfferIds,
+            IList<string> shopOfferIds,
+            IList<string> gatherUnlockOfferIds,
+            IList<string> processUnlockOfferIds)
         {
             Clear();
             IsActive = true;
@@ -116,8 +149,10 @@ namespace Soup.Levels
             ElvesClaimed = elvesClaimed;
             WarehouseClaimed = warehouseClaimed;
             RelicClaimed = relicClaimed;
+            ShopClaimed = shopClaimed;
             AdvancementClaimed = advancementClaimed;
             EventsClaimed = eventsClaimed;
+            StandardStageEventsStarted = standardStageEventsStarted;
             GatherCharges = Mathf.Max(0, gatherCharges);
             ProcessCharges = Mathf.Max(0, processCharges);
             CookCharges = Mathf.Max(0, cookCharges);
@@ -129,6 +164,18 @@ namespace Soup.Levels
                 else
                     BuildRelicOffers(LevelsClearedAtStart);
             }
+
+            if (!ShopClaimed && shopOfferIds != null)
+            {
+                for (int i = 0; i < shopOfferIds.Count; i++)
+                {
+                    if (!string.IsNullOrEmpty(shopOfferIds[i]))
+                        _shopOfferIds.Add(shopOfferIds[i]);
+                }
+            }
+
+            RestoreUnlockOfferIds(JobType.Gather, gatherUnlockOfferIds, _gatherUnlockOfferIds);
+            RestoreUnlockOfferIds(JobType.Process, processUnlockOfferIds, _processUnlockOfferIds);
 
             // If advancement was already marked but charges remain, keep charges for UI.
             if (AdvancementClaimed)
@@ -147,25 +194,121 @@ namespace Soup.Levels
             out bool elvesClaimed,
             out bool warehouseClaimed,
             out bool relicClaimed,
+            out bool shopClaimed,
             out bool advancementClaimed,
             out bool eventsClaimed,
+            out bool standardStageEventsStarted,
             out int gatherCharges,
             out int processCharges,
             out int cookCharges,
-            List<string> relicOfferIds)
+            List<string> relicOfferIds,
+            List<string> shopOfferIds,
+            List<string> gatherUnlockOfferIds,
+            List<string> processUnlockOfferIds)
         {
             elvesClaimed = ElvesClaimed;
             warehouseClaimed = WarehouseClaimed;
             relicClaimed = RelicClaimed;
+            shopClaimed = ShopClaimed;
             advancementClaimed = AdvancementClaimed;
             eventsClaimed = EventsClaimed;
+            standardStageEventsStarted = StandardStageEventsStarted;
             gatherCharges = GatherCharges;
             processCharges = ProcessCharges;
             cookCharges = CookCharges;
             relicOfferIds?.Clear();
-            if (relicOfferIds == null) return;
-            for (int i = 0; i < _relicOfferIds.Count; i++)
-                relicOfferIds.Add(_relicOfferIds[i]);
+            if (relicOfferIds != null)
+            {
+                for (int i = 0; i < _relicOfferIds.Count; i++)
+                    relicOfferIds.Add(_relicOfferIds[i]);
+            }
+
+            shopOfferIds?.Clear();
+            if (shopOfferIds != null)
+            {
+                for (int i = 0; i < _shopOfferIds.Count; i++)
+                    shopOfferIds.Add(_shopOfferIds[i]);
+            }
+
+            CaptureUnlockOfferIds(_gatherUnlockOfferIds, gatherUnlockOfferIds);
+            CaptureUnlockOfferIds(_processUnlockOfferIds, processUnlockOfferIds);
+        }
+
+        /// <summary>商店 3 选 1：本关首次打开时生成并缓存，跨场景返回仍用同一批。</summary>
+        public List<RelicItem> BuildShopOffers(int count)
+        {
+            var list = new List<RelicItem>(count);
+            if (!IsActive || ShopClaimed)
+                return list;
+
+            if (_shopOfferIds.Count > 0)
+            {
+                LoadShopOffersInto(list);
+                return list;
+            }
+
+            var relics = RelicManager.Instance;
+            if (relics == null) return list;
+
+            var picks = relics.CreateOffer(count, RelicAcquireStage.Shop, fillFromOtherStages: false);
+            for (int i = 0; i < picks.Count; i++)
+            {
+                if (picks[i] == null) continue;
+                list.Add(picks[i]);
+                _shopOfferIds.Add(picks[i].Id);
+            }
+
+            return list;
+        }
+
+        public bool TryPurchaseShopRelic(RelicItem relic, out string message)
+        {
+            message = string.Empty;
+            if (!IsActive || ShopClaimed)
+            {
+                message = "本关商店已购买";
+                return false;
+            }
+
+            if (relic == null || !_shopOfferIds.Contains(relic.Id))
+            {
+                message = "无效遗物选项";
+                return false;
+            }
+
+            var relics = RelicManager.Instance;
+            if (relics == null || !relics.Acquire(relic))
+            {
+                message = "无法获得该遗物";
+                return false;
+            }
+
+            ShopClaimed = true;
+            _shopOfferIds.Clear();
+            message = $"购得遗物：{relic.DisplayName}";
+            RaiseChanged();
+            return true;
+        }
+
+        private void LoadShopOffersInto(List<RelicItem> list)
+        {
+            list.Clear();
+            var relics = RelicManager.Instance;
+            if (relics == null) return;
+
+            for (int i = 0; i < _shopOfferIds.Count; i++)
+            {
+                var item = relics.GetById(_shopOfferIds[i]);
+                if (item == null) continue;
+                if (!RelicAcquireStageUtil.IsShopEligible(item.AcquireStage)) continue;
+                if (!item.AllowMultiple && relics.Has(item)) continue;
+                list.Add(item);
+            }
+
+            if (list.Count == 0 && !ShopClaimed)
+            {
+                _shopOfferIds.Clear();
+            }
         }
 
         public bool TryClaimElves(out string message)
@@ -208,6 +351,7 @@ namespace Soup.Levels
 
             store.AddWarehouseCapacityBonus(WarehouseBonusAmount);
             WarehouseClaimed = true;
+            TurnManager.Instance?.ClearUndoSnapshot();
             message = $"仓库上限 +{WarehouseBonusAmount}（当前 {store.WarehouseCapacity}）";
             AfterClaim();
             return true;
@@ -451,22 +595,24 @@ namespace Soup.Levels
             }
 
             int presented = events.PresentStageEvents();
-            if (presented <= 0)
+            if (presented > 0)
             {
-                // PresentStageEvents already fired StageEventBatchCompleted synchronously.
-                // MarkEventsResolved may have already completed; ensure flag.
-                if (!EventsClaimed)
-                {
-                    EventsClaimed = true;
-                    AfterClaim();
-                }
-
-                message = "本关没有可触发事件";
+                StandardStageEventsStarted = true;
+                message = $"出现 {presented} 个事件";
+                RaiseChanged();
                 return true;
             }
 
-            message = $"出现 {presented} 个事件";
-            RaiseChanged();
+            // PresentStageEvents already fired StageEventBatchCompleted synchronously.
+            // MarkEventsResolved may have already completed; ensure flag.
+            if (!EventsClaimed)
+            {
+                StandardStageEventsStarted = true;
+                EventsClaimed = true;
+                AfterClaim();
+            }
+
+            message = "本关没有可触发事件";
             return true;
         }
 
@@ -475,6 +621,21 @@ namespace Soup.Levels
             if (!IsActive || EventsClaimed) return;
             EventsClaimed = true;
             AfterClaim();
+        }
+
+        /// <summary>通关 / 遗物追加事件批次已开始（用于正确收尾 EventsClaimed）。</summary>
+        public void NotifyStageEventsPresented()
+        {
+            if (!IsActive) return;
+            StandardStageEventsStarted = true;
+        }
+
+        /// <summary>遗物追加事件时重新打开「事件」领取态。</summary>
+        public void ReopenEventsForBonus()
+        {
+            if (!IsActive) return;
+            EventsClaimed = false;
+            RaiseChanged();
         }
 
         /// <summary>
@@ -515,6 +676,14 @@ namespace Soup.Levels
                 GatherCharges = ProcessCharges = CookCharges = 0;
             }
 
+            var events = EventManager.Instance;
+            if (events != null
+                && (events.HasPendingEvent || events.HasStageEventBatch || events.QueuedEventCount > 0))
+            {
+                message = "请先完成当前事件选择";
+                return false;
+            }
+
             if (!EventsClaimed)
                 EventsClaimed = true;
 
@@ -546,27 +715,24 @@ namespace Soup.Levels
             return GetUnlockCandidates(JobType.Gather);
         }
 
+        /// <summary>进入进阶区前预生成解锁候选，本关内取消再选不会刷新。</summary>
+        public void EnsureUnlockOffers(JobType type)
+        {
+            var ids = UnlockOfferIdsFor(type);
+            if (ids == null || ids.Count > 0 || ChargeFor(type) <= 0)
+                return;
+
+            BuildUnlockOffers(type, ids);
+        }
+
         /// <summary>
         /// 本区可解锁岗位的随机 offer（最多 <see cref="JobProgressionRules.AdvancementUnlockOfferCount"/> 个）。
-        /// 从全部未拥有岗位中抽取；未选中的仍留在锁定池，下次仍有机会出现。
+        /// 首次请求时随机并缓存；本关内重复打开弹窗选项不变。
         /// </summary>
         public List<JobItem> GetUnlockCandidates(JobType type)
         {
-            var list = new List<JobItem>();
-            if (ChargeFor(type) <= 0) return list;
-
-            var progression = JobProgressionManager.Instance;
-            if (progression == null || !progression.CanUnlockMore(type))
-                return list;
-
-            var locked = progression.GetLocked(type);
-            if (locked.Count == 0) return list;
-
-            ShuffleJobs(locked);
-            int take = Mathf.Min(JobProgressionRules.AdvancementUnlockOfferCount, locked.Count);
-            for (int i = 0; i < take; i++)
-                list.Add(locked[i]);
-            return list;
+            EnsureUnlockOffers(type);
+            return LoadUnlockOffers(type);
         }
 
         public List<JobItem> GetGatherReplaceIncomingOffers()
@@ -710,13 +876,104 @@ namespace Soup.Levels
             {
                 case JobType.Gather:
                     GatherCharges = Mathf.Max(0, GatherCharges - 1);
+                    _gatherUnlockOfferIds.Clear();
                     break;
                 case JobType.Process:
                     ProcessCharges = Mathf.Max(0, ProcessCharges - 1);
+                    _processUnlockOfferIds.Clear();
                     break;
                 case JobType.Cook:
                     CookCharges = Mathf.Max(0, CookCharges - 1);
                     break;
+            }
+        }
+
+        private static void RestoreUnlockOfferIds(
+            JobType type,
+            IList<string> source,
+            List<string> target)
+        {
+            target.Clear();
+            if (source == null || source.Count == 0) return;
+            var jobs = JobManager.Instance;
+            if (jobs == null) return;
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                var job = jobs.GetById(source[i]);
+                if (job == null || job.JobType != type) continue;
+                var progression = JobProgressionManager.Instance;
+                if (progression != null && progression.IsUnlocked(job)) continue;
+                target.Add(source[i]);
+            }
+        }
+
+        private static void CaptureUnlockOfferIds(List<string> source, List<string> target)
+        {
+            target?.Clear();
+            if (target == null || source == null) return;
+            for (int i = 0; i < source.Count; i++)
+                target.Add(source[i]);
+        }
+
+        private List<string> UnlockOfferIdsFor(JobType type)
+        {
+            switch (type)
+            {
+                case JobType.Gather: return _gatherUnlockOfferIds;
+                case JobType.Process: return _processUnlockOfferIds;
+                default: return null;
+            }
+        }
+
+        private void BuildUnlockOffers(JobType type, List<string> ids)
+        {
+            ids.Clear();
+            var progression = JobProgressionManager.Instance;
+            if (progression == null || !progression.CanUnlockMore(type))
+                return;
+
+            var locked = progression.GetLocked(type);
+            if (locked.Count == 0) return;
+
+            ShuffleJobs(locked);
+            int take = Mathf.Min(JobProgressionRules.AdvancementUnlockOfferCount, locked.Count);
+            for (int i = 0; i < take; i++)
+            {
+                if (locked[i] == null || string.IsNullOrEmpty(locked[i].Id)) continue;
+                ids.Add(locked[i].Id);
+            }
+        }
+
+        private List<JobItem> LoadUnlockOffers(JobType type)
+        {
+            var list = new List<JobItem>();
+            var ids = UnlockOfferIdsFor(type);
+            if (ids == null || ids.Count == 0) return list;
+
+            AppendUnlockOffersFromIds(type, ids, list);
+            if (list.Count == 0 && ChargeFor(type) > 0 && ids.Count > 0)
+            {
+                ids.Clear();
+                BuildUnlockOffers(type, ids);
+                AppendUnlockOffersFromIds(type, ids, list);
+            }
+
+            return list;
+        }
+
+        private static void AppendUnlockOffersFromIds(JobType type, List<string> ids, List<JobItem> list)
+        {
+            var jobs = JobManager.Instance;
+            if (jobs == null) return;
+
+            for (int i = 0; i < ids.Count; i++)
+            {
+                var job = jobs.GetById(ids[i]);
+                if (job == null || job.JobType != type) continue;
+                var progression = JobProgressionManager.Instance;
+                if (progression != null && progression.IsUnlocked(job)) continue;
+                list.Add(job);
             }
         }
 

@@ -19,6 +19,10 @@ namespace Soup.Relics
         /// <summary>
         /// Not run via RelicEffectRunner.Run; queried for passive labor / loss hooks.
         /// </summary>
-        Passive = 7
+        Passive = 7,
+        /// <summary>Production turn fully resolved (after end-turn waste, before spicy).</summary>
+        TurnEnd = 8,
+        /// <summary>Campaign level ended (after last turn / sour settle, before clear rewards).</summary>
+        LevelEnd = 9
     }
 }

@@ -14,9 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: spore_invasion
   displayName: "\u5B62\u5B50\u5165\u4FB5"
-  description: "\u6BCF\u91C7\u96C6 5 \u4E2A\u91C7\u96C6\u7269\uFF0C\u5C31\u4F1A\u4EA7\u51FA
-    1 \u4EFD\u8611\u83C7\u98DF\u6750\u3002"
-  icon: {fileID: 0}
+  description: "\u6BCF\u91C7\u96C65\u4E2A\u91C7\u96C6\u7269\uFF0C\u5C31\u4F1A\u4EA7\u51FA1\u4EFD\u8611\u83C7\u98DF\u6750\u3002"
+  icon: {fileID: 21300000, guid: 9950baf93276f8b4fb0342f48b2b84c6, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 2
   allowMultiple: 0

@@ -1,5 +1,6 @@
 using System;
 using Soup.Jobs;
+using Soup.Relics;
 using UnityEngine;
 
 namespace Soup.Game
@@ -28,6 +29,7 @@ namespace Soup.Game
         private int _cooked;
         private int _warehouseCapacityBonus;
         private int _suppressChanged;
+        private bool _relicWarehouseBonusNormalized;
 
         public static ResourceStore Instance { get; private set; }
 
@@ -46,17 +48,22 @@ namespace Soup.Game
         /// <summary>未处理食材总数（三种材质之和）。</summary>
         public int TotalRaw => _soft + _tough + _solid;
 
-        /// <summary>关卡奖励等带来的仓库上限加成。</summary>
+        /// <summary>关卡奖励 / 事件等非遗物带来的仓库上限加成。</summary>
         public int WarehouseCapacityBonus => _warehouseCapacityBonus;
 
-        /// <summary>仓库容量 = 配置基础值 + 运行时加成。0 = 不限（仅当基础与加成都为 0）。</summary>
+        /// <summary>
+        /// 仓库容量 = 配置基础值 + 非遗物加成 + 持有遗物加成（如大仓库）。
+        /// 0 = 不限（仅当基础与加成都为 0）。
+        /// </summary>
         public int WarehouseCapacity
         {
             get
             {
+                EnsureRelicWarehouseBonusNormalized();
                 int baseCap = config != null ? Mathf.Max(0, config.WarehouseCapacity) : 0;
-                // Bonus may be negative (e.g. event penalties).
-                return Mathf.Max(0, baseCap + _warehouseCapacityBonus);
+                int relicBonus = RelicEffectRunner.SumOwnedWarehouseCapacityBonus();
+                // External bonus may be negative (event penalties).
+                return Mathf.Max(0, baseCap + _warehouseCapacityBonus + relicBonus);
             }
         }
 
@@ -115,6 +122,7 @@ namespace Soup.Game
             _spicy = _sour = _cold = _magic = 0;
             _processed = _cooked = 0;
             _warehouseCapacityBonus = 0;
+            _relicWarehouseBonusNormalized = false;
             RaiseChanged();
         }
 
@@ -160,6 +168,7 @@ namespace Soup.Game
             _processed = Mathf.Max(0, processed);
             _cooked = Mathf.Max(0, cooked);
             _warehouseCapacityBonus = warehouseCapacityBonus;
+            _relicWarehouseBonusNormalized = false;
             RaiseChanged();
         }
 
@@ -235,6 +244,29 @@ namespace Soup.Game
         {
             _warehouseCapacityBonus = value;
             RaiseChanged();
+        }
+
+        /// <summary>UI / 遗物获得后刷新显示。</summary>
+        public void NotifyChanged() => RaiseChanged();
+
+        /// <summary>
+        /// 旧存档 / 旧逻辑把「大仓库」一次性加进了 bonus 字段；剥掉遗物部分，改为实时按持有遗物计算。
+        /// </summary>
+        public void StripBakedRelicWarehouseBonus()
+        {
+            int relic = RelicEffectRunner.SumOwnedWarehouseCapacityBonus();
+            if (relic > 0 && _warehouseCapacityBonus > 0)
+                _warehouseCapacityBonus = Mathf.Max(0, _warehouseCapacityBonus - relic);
+            _relicWarehouseBonusNormalized = true;
+            RaiseChanged();
+        }
+
+        private void EnsureRelicWarehouseBonusNormalized()
+        {
+            if (_relicWarehouseBonusNormalized) return;
+            // Relics may not be ready on very first access during boot; retry next read.
+            if (RelicManager.Instance == null) return;
+            StripBakedRelicWarehouseBonus();
         }
 
         public int GetRaw(IngredientMaterial material)

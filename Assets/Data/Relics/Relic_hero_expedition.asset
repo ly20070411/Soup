@@ -14,12 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: hero_expedition
   displayName: "\u52C7\u8005\u51FA\u5F81"
-  description: "\u56DE\u5408\u5F00\u59CB\u65F6\uFF0C\u83B7\u5F97\u968F\u673A\u4E00\u79CD\u672A\u5904\u7406\u98DF\u6750
-    300 \u4EFD\u3002"
-  icon: {fileID: 0}
+  description: "\u56DE\u5408\u5F00\u59CB\u65F6\uFF0C\u83B7\u5F97\u968F\u673A\u4E00\u79CD\u672A\u5904\u7406\u98DF\u6750450\u4EFD\u3002"
+  icon: {fileID: 21300000, guid: 760060be783784043a6695cc3727ae8e, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
-  allowMultiple: 0
+  allowMultiple: 1
   rules:
   - trigger: 4
     condition: 0
@@ -29,7 +28,7 @@ MonoBehaviour:
     effect: 14
     floatValue: 1
     intValue: 0
-    amount: 300
+    amount: 450
     ingredient: {fileID: 0}
     material: 0
     employeeTypeId: 

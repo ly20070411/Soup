@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startingElfCount: 10
   warehouseCapacity: 2000
-  spicyMultiplierCap: 3
+  spicyMultiplierCap: 0
   enableStageEndEvents: 1
   stageEndEventCount: 2
   enableTurnEndEvents: 0

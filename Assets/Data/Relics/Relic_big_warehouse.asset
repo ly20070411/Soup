@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: big_warehouse
   displayName: "\u5927\u4ED3\u5E93"
-  description: "\u4ED3\u5E93\u5B58\u50A8\u589E\u52A0 4000\u3002"
-  icon: {fileID: 0}
+  description: "\u4ED3\u5E93\u5B58\u50A8\u589E\u52A04000\u3002"
+  icon: {fileID: 21300000, guid: c772aea77ef79394dbb15a06ad5790b4, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 2
   allowMultiple: 0

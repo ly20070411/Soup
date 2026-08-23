@@ -187,6 +187,49 @@ namespace Soup.Employees
         }
 
         /// <summary>
+        /// 篝火晚会等：所有已拥有员工都在烹饪岗（无空闲、无采集/处理分配）。
+        /// </summary>
+        public bool AreAllEmployeesOnCookJobs()
+        {
+            SyncLockedAssignments();
+            var jobs = JobManager.Instance;
+            if (jobs == null) return false;
+
+            int totalOwned = 0;
+            var all = All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var type = all[i];
+                if (type == null) continue;
+                int owned = GetOwned(type);
+                if (owned <= 0) continue;
+                totalOwned += owned;
+                if (!type.HasLockedJob && GetFree(type) > 0)
+                    return false;
+            }
+
+            if (totalOwned <= 0) return false;
+
+            int onCook = 0;
+            foreach (var jobPair in _assignments)
+            {
+                if (jobPair.Value == null || string.IsNullOrEmpty(jobPair.Key)) continue;
+                var job = jobs.GetById(jobPair.Key);
+                if (job == null) continue;
+
+                foreach (var typePair in jobPair.Value)
+                {
+                    if (typePair.Value <= 0) continue;
+                    if (job.JobType != JobType.Cook)
+                        return false;
+                    onCook += typePair.Value;
+                }
+            }
+
+            return onCook >= totalOwned;
+        }
+
+        /// <summary>
         /// 纯劳动力：人数 × 员工工作效率（含员工类型遗物加成），不含全局遗物/快乐坨坨效率层。
         /// </summary>
         public float GetPureLaborOnJob(JobItem job)
@@ -304,7 +347,10 @@ namespace Soup.Employees
             SetOwned(type.Id, count);
         }
 
-        public void SetOwned(string typeId, int count)
+        public void SetOwned(string typeId, int count) =>
+            SetOwned(typeId, count, notifyElfLoss: true);
+
+        public void SetOwned(string typeId, int count, bool notifyElfLoss)
         {
             if (string.IsNullOrEmpty(typeId)) return;
             int previous = GetOwned(typeId);
@@ -314,12 +360,27 @@ namespace Soup.Employees
             else
                 _owned[typeId] = count;
 
-            if (typeId == ElfId && count < previous)
+            if (notifyElfLoss && typeId == ElfId && count < previous)
                 RelicManager.Instance?.NotifyElvesLost(previous - count);
 
             EnforceLockedFill(typeId);
             ClampAssignmentsForType(typeId);
             RaiseChanged();
+        }
+
+        /// <summary>
+        /// 将小精灵升华为幽灵：精灵不足则跳过；不触发「损失小精灵」类遗物。
+        /// </summary>
+        public bool TryConvertElvesToGhosts(int elvesCost, int ghostsGain)
+        {
+            elvesCost = Mathf.Max(0, elvesCost);
+            ghostsGain = Mathf.Max(0, ghostsGain);
+            if (elvesCost <= 0 || ghostsGain <= 0) return false;
+            if (GetOwned(ElfId) < elvesCost) return false;
+
+            SetOwned(ElfId, GetOwned(ElfId) - elvesCost, notifyElfLoss: false);
+            Add(GhostId, ghostsGain);
+            return true;
         }
 
         public void Add(EmployeeItem type, int amount)
@@ -403,6 +464,34 @@ namespace Soup.Employees
 
             int next = Mathf.Max(0, current - amount);
             SetAssignedRaw(type, job, next);
+            RaiseChanged();
+            return true;
+        }
+
+        /// <summary>移除此岗位上所有可手动分配的员工（锁定岗如蘑菇人不受影响）。</summary>
+        public bool TryClearJobAssignments(JobItem job)
+        {
+            if (job == null || string.IsNullOrEmpty(job.Id)) return false;
+            SyncLockedAssignments();
+            if (!_assignments.TryGetValue(job.Id, out var map) || map == null || map.Count == 0)
+                return false;
+
+            bool changed = false;
+            var typeIds = new List<string>(map.Keys);
+            for (int i = 0; i < typeIds.Count; i++)
+            {
+                var type = GetById(typeIds[i]);
+                if (type == null || type.HasLockedJob || !type.CanPlayerAssign)
+                    continue;
+                if (map[typeIds[i]] <= 0) continue;
+                map.Remove(typeIds[i]);
+                changed = true;
+            }
+
+            if (map.Count == 0)
+                _assignments.Remove(job.Id);
+
+            if (!changed) return false;
             RaiseChanged();
             return true;
         }

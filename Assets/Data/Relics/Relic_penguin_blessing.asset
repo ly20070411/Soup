@@ -14,9 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: penguin_blessing
   displayName: "\u51D1\u4F01\u9E45\u7684\u795D\u798F"
-  description: "\u6BCF\u751F\u4EA7 5 \u4E2A\u575A\u56FA\u98DF\u6750\uFF0C\u989D\u5916\u83B7\u5F97
-    1 \u4E2A\u575A\u56FA\u98DF\u6750\u3002"
-  icon: {fileID: 0}
+  description: "\u6BCF\u751F\u4EA75\u4E2A\u575A\u56FA\u98DF\u6750\uFF0C\u989D\u5916\u83B7\u5F971\u4E2A\u575A\u56FA\u98DF\u6750\u3002"
+  icon: {fileID: 21300000, guid: 82c239d00d73b8b489653af4ceea6cf4, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 0

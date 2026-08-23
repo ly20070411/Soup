@@ -24,8 +24,23 @@ namespace Soup.Game.Editor
         [InitializeOnLoadMethod]
         private static void WatchRequestFile()
         {
-            EditorApplication.delayCall += () =>
-            {
+            EditorApplication.delayCall += TryBuildFromRequestFile;
+            EditorApplication.update += OnEditorUpdate;
+        }
+
+        private static double _nextRequestCheck;
+
+        private static void OnEditorUpdate()
+        {
+            if (EditorApplication.timeSinceStartup < _nextRequestCheck)
+                return;
+
+            _nextRequestCheck = EditorApplication.timeSinceStartup + 1.0;
+            TryBuildFromRequestFile();
+        }
+
+        private static void TryBuildFromRequestFile()
+        {
                 string requestPath = Path.Combine(Directory.GetCurrentDirectory(), RequestFileRelative);
                 if (!File.Exists(requestPath))
                     return;
@@ -39,7 +54,6 @@ namespace Soup.Game.Editor
 
                 Debug.Log("[WindowsPlayerBuilder] Detected Temp/RequestWindowsBuild — starting Windows build.");
                 Build(exitEditor: false);
-            };
         }
 
         public static void Build(bool exitEditor)

@@ -14,9 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: vegetarianism
   displayName: "\u7D20\u98DF\u4E3B\u4E49"
-  description: "\u82E5\u6CA1\u6709\u8089\u7C7B\u98DF\u6750\uFF0C\u6700\u7EC8\u500D\u7387
-    +0.4\u3002"
-  icon: {fileID: 0}
+  description: "\u82E5\u6CA1\u6709\u8089\u7C7B\u98DF\u6750\uFF0C\u6700\u7EC8\u500D\u7387\u52A00.4\u3002"
+  icon: {fileID: 21300000, guid: 066e21f0651925244a61f36fb6e5c573, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 2
   allowMultiple: 0

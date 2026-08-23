@@ -32,3 +32,8 @@ MonoBehaviour:
   titleStartButton: {fileID: 21300000, guid: 7702f091291388d48b0eb9cf36227cee, type: 3}
   titleContinueButton: {fileID: 21300000, guid: 46b5fa018e1e6d643aa7f7ba222c943a, type: 3}
   titleQuitButton: {fileID: 21300000, guid: ab5150b165ca56c44bb812fe5cad2f64, type: 3}
+  shopBackground: {fileID: 21300000, guid: 44d4ab9049a6ccb44ae1b8b268064f66, type: 3}
+  shopCatPortrait: {fileID: 21300000, guid: 6fdf04417a1c6614c87d382294a7654e, type: 3}
+  eventPanelBackground: {fileID: 21300000, guid: f1c804c0b72af874097b1e4d7adf4aaa, type: 3}
+  eventIllustrationFrame: {fileID: 21300000, guid: f9c4ed23b34e69c46aee4a620539dfce, type: 3}
+  victorySettlementBackground: {fileID: 21300000, guid: 6b5851d7939e06642bba9d14605a63bb, type: 3}

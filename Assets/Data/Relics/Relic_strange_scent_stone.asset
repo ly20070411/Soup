@@ -14,10 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: strange_scent_stone
   displayName: "\u5F02\u9999\u77F3"
-  description: "\u524D 5 \u4E2A\u56DE\u5408\u5168\u5C40\u5DE5\u4F5C\u6548\u7387\u52A0
-    0.5\uFF0C\u540E 5 \u4E2A\u56DE\u5408\u5168\u5C40\u5DE5\u4F5C\u6548\u7387\u51CF
-    0.5\u3002"
-  icon: {fileID: 0}
+  description: "\u524D5\u4E2A\u56DE\u5408\u5168\u5C40\u5DE5\u4F5C\u6548\u7387\u52A00.5\uFF0C\u540E5\u4E2A\u56DE\u5408\u5168\u5C40\u5DE5\u4F5C\u6548\u7387\u51CF0.5\u3002"
+  icon: {fileID: 21300000, guid: c015552b403d2b24b9580c3427d88687, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 0

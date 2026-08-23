@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: ritual
   displayName: "\u4EEA\u5F0F"
-  description: "\u6BCF\u5173\u5F00\u59CB\u65F6\u83B7\u5F97 1 \u4E2A \u6FC0\u52B1\u3002"
-  icon: {fileID: 0}
+  description: "\u6BCF\u5173\u5F00\u59CB\u65F6\u83B7\u5F971\u4E2A \u6FC0\u52B1\u3002"
+  icon: {fileID: 21300000, guid: 039a4bb5888217d488e4ab5d5190fe37, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 0

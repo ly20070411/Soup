@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: delicious_powder
   displayName: "\u7F8E\u5473\u7C89"
-  description: "\u6700\u7EC8\u500D\u7387\u52A0 0.1\u3002\u53EF\u91CD\u590D\u83B7\u5F97\u3002"
-  icon: {fileID: 0}
+  description: "\u6700\u7EC8\u500D\u7387\u52A00.1\uFF0C\u53EF\u91CD\u590D\u83B7\u5F97\u3002"
+  icon: {fileID: 21300000, guid: fda658bf1301a804093afd6457ac99e6, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 1
   allowMultiple: 1

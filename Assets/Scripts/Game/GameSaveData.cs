@@ -33,6 +33,7 @@ namespace Soup.Game
         public int processed;
         public int cooked;
         public int warehouseCapacityBonus;
+        public int pendingRelicProcessedGrant;
 
         public int totalElves;
         public List<JobAssignmentSave> assignments = new List<JobAssignmentSave>();
@@ -51,6 +52,7 @@ namespace Soup.Game
         public List<string> pendingGatherEfficiencyPenaltyJobIds = new List<string>();
         public List<float> pendingGatherEfficiencyPenaltyValues = new List<float>();
         public int endTurnIncentivesGrantedThisLevel;
+        public bool gatherJobsActAsHappyTuotuo;
 
         public List<string> ownedRelicIds = new List<string>();
 
@@ -67,15 +69,21 @@ namespace Soup.Game
         public int levelOutcome;
         public bool levelAwaitingSettle;
         public int levelsClearedCount;
+        public List<bool> levelChallengeReachedFlags = new List<bool>();
         public bool levelRewardElvesClaimed;
         public bool levelRewardWarehouseClaimed;
         public bool levelRewardRelicClaimed;
+        public bool levelRewardShopClaimed;
         public bool levelRewardAdvanceClaimed;
         public bool levelRewardEventsClaimed;
+        public bool levelRewardStandardStageEventsStarted;
         public int levelRewardGatherCharges;
         public int levelRewardProcessCharges;
         public int levelRewardCookCharges;
         public List<string> levelRewardRelicOfferIds = new List<string>();
+        public List<string> levelRewardShopOfferIds = new List<string>();
+        public List<string> levelRewardGatherUnlockOfferIds = new List<string>();
+        public List<string> levelRewardProcessUnlockOfferIds = new List<string>();
 
         public List<JobEventModSave> jobEventMods = new List<JobEventModSave>();
 

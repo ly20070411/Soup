@@ -210,6 +210,7 @@ namespace Soup.Game
                     data.pendingGatherEfficiencyPenaltyJobIds,
                     data.pendingGatherEfficiencyPenaltyValues);
                 data.endTurnIncentivesGrantedThisLevel = progression.EndTurnIncentivesGrantedThisLevel;
+                data.gatherJobsActAsHappyTuotuo = progression.GatherJobsActAsHappyTuotuo;
 
                 if (data.jobEventMods == null)
                     data.jobEventMods = new List<JobEventModSave>();
@@ -225,6 +226,8 @@ namespace Soup.Game
                     if (relic != null && !string.IsNullOrEmpty(relic.Id))
                         data.ownedRelicIds.Add(relic.Id);
                 }
+
+                data.pendingRelicProcessedGrant = 0;
             }
 
             var events = EventManager.Instance;
@@ -245,6 +248,12 @@ namespace Soup.Game
             {
                 if (data.levelRewardRelicOfferIds == null)
                     data.levelRewardRelicOfferIds = new List<string>();
+                if (data.levelRewardShopOfferIds == null)
+                    data.levelRewardShopOfferIds = new List<string>();
+                if (data.levelRewardGatherUnlockOfferIds == null)
+                    data.levelRewardGatherUnlockOfferIds = new List<string>();
+                if (data.levelRewardProcessUnlockOfferIds == null)
+                    data.levelRewardProcessUnlockOfferIds = new List<string>();
                 levels.CaptureState(
                     out data.levelId,
                     out data.levelListIndex,
@@ -257,12 +266,18 @@ namespace Soup.Game
                     out data.levelRewardElvesClaimed,
                     out data.levelRewardWarehouseClaimed,
                     out data.levelRewardRelicClaimed,
+                    out data.levelRewardShopClaimed,
                     out data.levelRewardAdvanceClaimed,
                     out data.levelRewardEventsClaimed,
+                    out data.levelRewardStandardStageEventsStarted,
                     out data.levelRewardGatherCharges,
                     out data.levelRewardProcessCharges,
                     out data.levelRewardCookCharges,
-                    data.levelRewardRelicOfferIds);
+                    data.levelRewardRelicOfferIds,
+                    data.levelRewardShopOfferIds,
+                    data.levelRewardGatherUnlockOfferIds,
+                    data.levelRewardProcessUnlockOfferIds,
+                    data.levelChallengeReachedFlags);
             }
 
             var cam = UnityEngine.Object.FindObjectOfType<ZoneCameraController>();
@@ -308,9 +323,13 @@ namespace Soup.Game
                 data.pendingGatherEfficiencyPenaltyJobIds,
                 data.pendingGatherEfficiencyPenaltyValues,
                 data.endTurnIncentivesGrantedThisLevel,
-                data.jobEventMods);
+                data.jobEventMods,
+                data.gatherJobsActAsHappyTuotuo);
 
             RelicManager.Instance?.ApplyOwnedIds(data.ownedRelicIds);
+            // pendingRelicProcessedGrant obsolete (stewed_zhizhi grants on level enter).
+            // Old saves baked 大仓库 into warehouseCapacityBonus; strip so capacity isn't double-counted.
+            ResourceStore.Instance?.StripBakedRelicWarehouseBonus();
             MigrateLegacyChiefIncentive(data.chiefIncentive);
 
             EventManager.Instance?.ApplyState(
@@ -328,13 +347,19 @@ namespace Soup.Game
                 data.levelRewardElvesClaimed,
                 data.levelRewardWarehouseClaimed,
                 data.levelRewardRelicClaimed,
+                data.levelRewardShopClaimed,
                 data.levelRewardAdvanceClaimed,
                 data.levelRewardEventsClaimed,
+                data.levelRewardStandardStageEventsStarted,
                 data.levelRewardGatherCharges,
                 data.levelRewardProcessCharges,
                 data.levelRewardCookCharges,
                 data.levelRewardRelicOfferIds,
-                data.levelFinishedScore);
+                data.levelRewardShopOfferIds,
+                data.levelRewardGatherUnlockOfferIds,
+                data.levelRewardProcessUnlockOfferIds,
+                data.levelFinishedScore,
+                data.levelChallengeReachedFlags);
 
             if (EmployeeManager.Instance != null && data.employees != null && data.employees.Count > 0)
             {

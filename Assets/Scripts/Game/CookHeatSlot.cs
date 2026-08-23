@@ -20,6 +20,8 @@ namespace Soup.Game
         private Collider2D _minusHit;
         private Collider2D _plusHit;
         private Collider2D _hoverHit;
+        private Transform _clearButton;
+        private Collider2D _clearHit;
         private CookZoneView _zone;
 
         public string JobId => jobId;
@@ -34,6 +36,7 @@ namespace Soup.Game
             EnsureColliders();
             EnsureLabels();
             SetAssignPadsVisible(!AdvancementVisit.IsActive);
+            LayoutAssignControls();
             RefreshCount();
         }
 
@@ -42,6 +45,7 @@ namespace Soup.Game
             bool show = visible && IsBound && !AdvancementVisit.IsActive;
             if (minusButton != null) minusButton.gameObject.SetActive(show);
             if (plusButton != null) plusButton.gameObject.SetActive(show);
+            StationAssignClearPad.SetActive(_clearButton, show);
             if (countFrame != null) countFrame.gameObject.SetActive(IsBound);
             if (countMesh != null) countMesh.gameObject.SetActive(IsBound);
         }
@@ -74,6 +78,12 @@ namespace Soup.Game
                 return;
 
             if (hit == null) return;
+            if (StationAssignClearPad.IsHit(hit, _clearButton, _clearHit))
+            {
+                TryClearAll();
+                return;
+            }
+
             if (hit == _plusHit || hit.transform == plusButton || hit.name.Contains("Plus"))
                 TryChange(+1);
             else if (hit == _minusHit || hit.transform == minusButton || hit.name.Contains("Minus"))
@@ -100,9 +110,24 @@ namespace Soup.Game
                     TryChange(-1);
                     return true;
                 }
+
+                if (StationAssignClearPad.IsHit(h, _clearButton, _clearHit))
+                {
+                    TryClearAll();
+                    return true;
+                }
             }
 
             return false;
+        }
+
+        private void TryClearAll()
+        {
+            var em = EmployeeManager.Instance;
+            if (em == null || _job == null) return;
+            if (!em.TryClearJobAssignments(_job)) return;
+            RefreshCount();
+            ResolveZone()?.Refresh();
         }
 
         private void TryChange(int delta)
@@ -130,6 +155,15 @@ namespace Soup.Game
             _minusHit = EnsureButtonCollider(minusButton);
             _plusHit = EnsureButtonCollider(plusButton);
             _hoverHit = EnsureHoverCollider();
+            int sorting = countFrame != null ? countFrame.sortingOrder + 4 : 32;
+            _clearHit = StationAssignClearPad.Ensure(ref _clearButton, transform, sorting);
+        }
+
+        private void LayoutAssignControls()
+        {
+            if (!IsBound) return;
+            StationAssignClearPad.LayoutBelowControls(
+                _clearButton, minusButton, plusButton, countFrame);
         }
 
         private Collider2D EnsureHoverCollider()
@@ -219,6 +253,7 @@ namespace Soup.Game
         {
             EnsureColliders();
             EnsureLabels();
+            LayoutAssignControls();
         }
     }
 }

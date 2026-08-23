@@ -14,9 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: no_spice_no_joy
   displayName: "\u65E0\u8FA3\u4E0D\u6B22"
-  description: "\u70ED\u8FA3\u63D0\u4F9B\u7684\u5206\u6570\u989D\u5916\u52A0 0.5
-    \u500D\u3002"
-  icon: {fileID: 0}
+  description: "\u70ED\u8FA3\u63D0\u4F9B\u7684\u500D\u6570\u53D8\u4E3A1.5\u500D\u3002"
+  icon: {fileID: 21300000, guid: 6fb952ef6b6cec742a5e5b26b943e396, type: 3}
   tint: {r: 1, g: 1, b: 1, a: 1}
   acquireStage: 2
   allowMultiple: 0

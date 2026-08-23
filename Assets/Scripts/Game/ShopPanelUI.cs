@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Soup.Events;
+using Soup.Levels;
 using Soup.Relics;
 using UnityEngine;
 using UnityEngine.UI;
@@ -25,6 +27,7 @@ namespace Soup.Game
         private CanvasGroup _contentGroup;
         private Text _titleText;
         private Text _hintText;
+        private Image _shopPanelBg;
         private Image _rightImage;
         private Text _rightImageHint;
         private readonly RelicSlot[] _slots = new RelicSlot[OfferCount];
@@ -33,7 +36,6 @@ namespace Soup.Game
         private bool _built;
         private bool _open;
         private bool _animating;
-        private bool _purchasedThisVisit;
         private Coroutine _animCo;
         private Action<string> _toast;
         private Action _onClosed;
@@ -49,7 +51,9 @@ namespace Soup.Game
         }
 
         public bool IsOpen => _open;
-        public bool PurchasedThisVisit => _purchasedThisVisit;
+
+        public bool PurchasedThisVisit =>
+            LevelManager.Instance?.ClearRewards?.ShopClaimed == true;
 
         public static ShopPanelUI Ensure(Transform parent = null)
         {
@@ -114,10 +118,10 @@ namespace Soup.Game
         private bool RefreshOffers()
         {
             _offers.Clear();
-            var relics = RelicManager.Instance;
-            if (relics == null) return false;
+            var session = LevelManager.Instance?.ClearRewards;
+            if (session == null || !session.IsActive) return false;
 
-            var offer = relics.CreateOffer(OfferCount, RelicAcquireStage.Shop, fillFromOtherStages: false);
+            var offer = session.BuildShopOffers(OfferCount);
             for (int i = 0; i < offer.Count; i++)
             {
                 if (offer[i] != null)
@@ -148,26 +152,12 @@ namespace Soup.Game
                     slot.Name.text = relic.DisplayName;
                 if (slot.Body != null)
                 {
-                    string rules = relic.GetRulesSummary();
-                    string desc = relic.Description ?? string.Empty;
-                    slot.Body.text = string.IsNullOrWhiteSpace(rules) || rules == "无规则"
-                        ? desc
-                        : (string.IsNullOrWhiteSpace(desc) ? rules : rules + "\n" + desc);
+                    slot.Body.text = string.Empty;
+                    slot.Body.gameObject.SetActive(false);
                 }
 
                 if (slot.Icon != null)
-                {
-                    if (relic.Icon != null)
-                    {
-                        slot.Icon.sprite = relic.Icon;
-                        slot.Icon.color = relic.Tint.a > 0.01f ? relic.Tint : Color.white;
-                    }
-                    else
-                    {
-                        slot.Icon.sprite = GameOverlayUI.SharedUiSprite();
-                        slot.Icon.color = new Color(0.45f, 0.50f, 0.62f, 1f);
-                    }
-                }
+                    slot.Icon.gameObject.SetActive(false);
 
                 BindShopRelicHover(slot, relic);
             }
@@ -177,7 +167,7 @@ namespace Soup.Game
             if (_hintText != null)
                 _hintText.text = "选择一件遗物（免费）";
             if (_rightImageHint != null)
-                _rightImageHint.text = "图片（待定）";
+                _rightImageHint.gameObject.SetActive(_rightImage == null || _rightImage.sprite == null);
         }
 
         private static void BindShopRelicHover(RelicSlot slot, RelicItem relic)
@@ -208,15 +198,29 @@ namespace Soup.Game
                 return;
             }
 
-            var relics = RelicManager.Instance;
-            if (relics == null || !relics.Acquire(relic))
+            var session = LevelManager.Instance?.ClearRewards;
+            if (session == null)
             {
                 Toast("无法获得该遗物");
                 return;
             }
 
-            _purchasedThisVisit = true;
-            Toast($"购得遗物：{relic.DisplayName}");
+            var events = EventManager.Instance;
+            if (events != null
+                && (events.HasPendingEvent || events.HasStageEventBatch || events.QueuedEventCount > 0))
+            {
+                Toast("请先完成当前事件选择");
+                return;
+            }
+
+            if (!session.TryPurchaseShopRelic(relic, out var msg))
+            {
+                Toast(string.IsNullOrEmpty(msg) ? "无法获得该遗物" : msg);
+                return;
+            }
+
+            TurnManager.Instance?.ClearUndoSnapshot();
+            Toast(msg);
             Hide(animate: true);
         }
 
@@ -312,16 +316,55 @@ namespace Soup.Game
                 return;
             }
 
+            var overlay = FindObjectOfType<GameOverlayUI>();
+            if (overlay != null)
+            {
+                overlay.ShowToast(message, 3f);
+                return;
+            }
+
             var inter = FindObjectOfType<InterLevelUI>();
             inter?.ShowToast(message, 3f);
         }
 
         private void EnsureBuilt()
         {
-            if (_built) return;
-            Build();
-            _built = true;
-            SetVisibleRoot(false);
+            if (!_built)
+            {
+                Build();
+                _built = true;
+                SetVisibleRoot(false);
+            }
+
+            ApplyShopArt();
+        }
+
+        private void ApplyShopArt()
+        {
+            var art = GameArtLibrary.Load();
+            if (_shopPanelBg != null)
+            {
+                if (art != null && art.ShopBackground != null)
+                {
+                    _shopPanelBg.sprite = art.ShopBackground;
+                    _shopPanelBg.color = Color.white;
+                    _shopPanelBg.preserveAspect = false;
+                    _shopPanelBg.type = Image.Type.Simple;
+                }
+            }
+
+            if (_rightImage != null)
+            {
+                if (art != null && art.ShopCatPortrait != null)
+                {
+                    _rightImage.sprite = art.ShopCatPortrait;
+                    _rightImage.color = Color.white;
+                    _rightImage.preserveAspect = true;
+                    _rightImage.type = Image.Type.Simple;
+                    if (_rightImageHint != null)
+                        _rightImageHint.gameObject.SetActive(false);
+                }
+            }
         }
 
         private void Build()
@@ -376,21 +419,21 @@ namespace Soup.Game
             shopRect.anchorMax = new Vector2(0.58f, 1f);
             shopRect.offsetMin = Vector2.zero;
             shopRect.offsetMax = new Vector2(-16f, 0f);
-            var shopBg = shopGo.AddComponent<Image>();
-            shopBg.sprite = GameOverlayUI.SharedUiSprite();
-            shopBg.color = new Color(0.12f, 0.14f, 0.20f, 0.98f);
-            shopBg.raycastTarget = true;
+            _shopPanelBg = shopGo.AddComponent<Image>();
+            _shopPanelBg.sprite = GameOverlayUI.SharedUiSprite();
+            _shopPanelBg.color = new Color(0.12f, 0.14f, 0.20f, 0.98f);
+            _shopPanelBg.raycastTarget = true;
 
             _titleText = CreateText(shopGo.transform, "Title",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -28f), new Vector2(600f, 48f),
-                34, FontStyle.Bold, TextAnchor.MiddleCenter);
+                new Vector2(0f, -20f), new Vector2(460f, 30f),
+                24, FontStyle.Bold, TextAnchor.MiddleCenter);
             _titleText.text = "商店";
 
             _hintText = CreateText(shopGo.transform, "Hint",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -72f), new Vector2(600f, 32f),
-                18, FontStyle.Normal, TextAnchor.MiddleCenter);
+                new Vector2(0f, -48f), new Vector2(460f, 24f),
+                14, FontStyle.Normal, TextAnchor.MiddleCenter);
             _hintText.color = new Color(0.78f, 0.82f, 0.90f, 1f);
             _hintText.text = "选择一件遗物（免费）";
 
@@ -399,23 +442,28 @@ namespace Soup.Game
             var listRect = listGo.AddComponent<RectTransform>();
             listRect.anchorMin = new Vector2(0f, 0f);
             listRect.anchorMax = new Vector2(1f, 1f);
-            listRect.offsetMin = new Vector2(24f, 24f);
-            listRect.offsetMax = new Vector2(-24f, -110f);
+            // Keep cards inside the shop-background frame (art has thick borders).
+            listRect.offsetMin = new Vector2(64f, 56f);
+            listRect.offsetMax = new Vector2(-64f, -78f);
             var layout = listGo.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 14f;
-            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.spacing = 0f;
+            layout.padding = new RectOffset(8, 8, 4, 4);
+            layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
-            layout.childForceExpandWidth = true;
+            layout.childForceExpandWidth = false;
 
+            // Even vertical rhythm: spacer · card · spacer · card · spacer · card · spacer
+            CreateFlexSpacer(listGo.transform);
             for (int i = 0; i < OfferCount; i++)
             {
                 int index = i;
                 _slots[i] = CreateRelicSlot(listGo.transform, index, () => OnRelicClicked(index));
+                CreateFlexSpacer(listGo.transform);
             }
 
-            // Right: image placeholder
+            // Right: cat portrait
             var rightGo = new GameObject("RightImage");
             rightGo.transform.SetParent(contentGo.transform, false);
             var rightRect = rightGo.AddComponent<RectTransform>();
@@ -427,6 +475,7 @@ namespace Soup.Game
             _rightImage.sprite = GameOverlayUI.SharedUiSprite();
             _rightImage.color = new Color(0.18f, 0.22f, 0.28f, 1f);
             _rightImage.raycastTarget = true;
+            _rightImage.preserveAspect = true;
 
             _rightImageHint = CreateText(rightGo.transform, "ImageHint",
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
@@ -436,64 +485,57 @@ namespace Soup.Game
             _rightImageHint.text = "图片（待定）";
         }
 
+        private static void CreateFlexSpacer(Transform parent)
+        {
+            var go = new GameObject("Spacer");
+            go.transform.SetParent(parent, false);
+            var le = go.AddComponent<LayoutElement>();
+            le.minHeight = 8f;
+            le.preferredHeight = 8f;
+            le.flexibleHeight = 1f;
+        }
+
         private RelicSlot CreateRelicSlot(Transform parent, int index, UnityEngine.Events.UnityAction onClick)
         {
             var go = new GameObject($"Relic{index}");
             go.transform.SetParent(parent, false);
             var le = go.AddComponent<LayoutElement>();
-            le.minHeight = 150f;
-            le.preferredHeight = 160f;
+            // 原宽约铺满列表；现宽减半并居中。原高 64 → ×1.5 = 96。
+            le.minWidth = 280f;
+            le.preferredWidth = 300f;
+            le.flexibleWidth = 0f;
+            le.minHeight = 96f;
+            le.preferredHeight = 96f;
+            le.flexibleHeight = 0f;
 
             var image = go.AddComponent<Image>();
             var button = go.AddComponent<Button>();
             GameOverlayUI.ApplyArtButtonStyle(image, button);
             button.onClick.AddListener(onClick);
 
-            var iconGo = new GameObject("Icon");
-            iconGo.transform.SetParent(go.transform, false);
-            var iconRect = iconGo.AddComponent<RectTransform>();
-            iconRect.anchorMin = new Vector2(0f, 0.5f);
-            iconRect.anchorMax = new Vector2(0f, 0.5f);
-            iconRect.pivot = new Vector2(0f, 0.5f);
-            iconRect.anchoredPosition = new Vector2(16f, 0f);
-            iconRect.sizeDelta = new Vector2(96f, 96f);
-            var icon = iconGo.AddComponent<Image>();
-            icon.sprite = GameOverlayUI.SharedUiSprite();
-            icon.color = new Color(0.45f, 0.50f, 0.62f, 1f);
-            icon.preserveAspect = true;
-            icon.raycastTarget = false;
-
+            // 选项框内仅显示名称；描述走悬停提示。
             var name = CreateText(go.transform, "Name",
-                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f),
-                new Vector2(130f, -14f), new Vector2(-150f, 36f),
-                22, FontStyle.Bold, TextAnchor.MiddleLeft);
-            var nameRect = name.GetComponent<RectTransform>();
-            nameRect.anchorMin = new Vector2(0f, 1f);
-            nameRect.anchorMax = new Vector2(1f, 1f);
-            nameRect.pivot = new Vector2(0f, 1f);
-            nameRect.offsetMin = new Vector2(130f, -50f);
-            nameRect.offsetMax = new Vector2(-16f, -12f);
-
-            var body = CreateText(go.transform, "Body",
-                new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f),
+                new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f),
                 Vector2.zero, Vector2.zero,
-                16, FontStyle.Normal, TextAnchor.UpperLeft);
-            body.color = new Color(0.85f, 0.88f, 0.92f, 1f);
-            body.horizontalOverflow = HorizontalWrapMode.Wrap;
-            body.verticalOverflow = VerticalWrapMode.Truncate;
-            var bodyRect = body.GetComponent<RectTransform>();
-            bodyRect.anchorMin = new Vector2(0f, 0f);
-            bodyRect.anchorMax = new Vector2(1f, 1f);
-            bodyRect.offsetMin = new Vector2(130f, 12f);
-            bodyRect.offsetMax = new Vector2(-16f, -54f);
+                28, FontStyle.Bold, TextAnchor.MiddleCenter);
+            var nameRect = name.GetComponent<RectTransform>();
+            nameRect.anchorMin = Vector2.zero;
+            nameRect.anchorMax = Vector2.one;
+            nameRect.offsetMin = new Vector2(12f, 8f);
+            nameRect.offsetMax = new Vector2(-12f, -8f);
+            name.horizontalOverflow = HorizontalWrapMode.Wrap;
+            name.verticalOverflow = VerticalWrapMode.Truncate;
+            name.resizeTextForBestFit = true;
+            name.resizeTextMinSize = 16;
+            name.resizeTextMaxSize = 36;
 
             return new RelicSlot
             {
                 Root = go,
                 Button = button,
-                Icon = icon,
+                Icon = null,
                 Name = name,
-                Body = body
+                Body = null
             };
         }
 

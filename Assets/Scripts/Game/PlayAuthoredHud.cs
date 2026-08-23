@@ -31,6 +31,7 @@ namespace Soup.Game
         [Header("Employee")]
         [SerializeField] private Image employeeAvatar;
         [SerializeField] private Text employeeCount;
+        [SerializeField] private Text employeeSwitchHint;
         [SerializeField] private Button employeeAvatarButton;
         [SerializeField] private RectTransform employeePickerRoot;
 
@@ -42,11 +43,14 @@ namespace Soup.Game
         [SerializeField] private Button relicNextButton;
 
         private readonly List<Button> _pickerButtons = new List<Button>();
+        private readonly List<RelicItem> _uniqueRelics = new List<RelicItem>(16);
+        private readonly List<Text> _relicStackLabels = new List<Text>(16);
         private bool _pickerOpen;
         private int _relicStart;
         private static Sprite _relicPlaceholderSprite;
         private RelicHudTooltip _relicTooltip;
         private bool _relicHoversReady;
+        private bool _relicClicksReady;
 
         private void Awake()
         {
@@ -54,8 +58,10 @@ namespace Soup.Game
             WireButtons();
             EnsureRelicTooltipUi();
             EnsureRelicSlotHovers();
+            EnsureRelicSlotClicks();
             EnsureFlavorAndEmployeeHovers();
             EnsureResourceFlavorIcons();
+            EnsureEmployeeSwitchHint();
         }
 
         private void OnEnable()
@@ -68,6 +74,8 @@ namespace Soup.Game
         {
             EmployeeAssignSelection.Changed -= OnEmployeeSelectionChanged;
             HideRelicTooltip();
+            if (FindObjectOfType<RelicPreviewOverlayUI>() != null)
+                RelicPreviewOverlayUI.Ensure().Hide();
         }
 
         private void Start()
@@ -125,11 +133,16 @@ namespace Soup.Game
         private void CycleRelics(int direction)
         {
             int slotCount = RelicSlotCount;
-            int ownedCount = OwnedRelicCount;
+            int ownedCount = OwnedRelicTypeCount;
             int maxStart = RelicMaxStart(ownedCount, slotCount);
-            if (maxStart <= 0) return;
+            if (maxStart <= 0 || slotCount <= 0) return;
 
-            _relicStart = Mathf.Clamp(_relicStart + direction, 0, maxStart);
+            // 一次翻一整排（当前可见格数），不是逐个挪。
+            int step = RelicPageStep(slotCount);
+            int next = _relicStart + direction * step;
+            // 对齐到排首，避免停在半排。
+            next = Mathf.FloorToInt(next / (float)step) * step;
+            _relicStart = Mathf.Clamp(next, 0, maxStart);
             RefreshRelics();
         }
 
@@ -351,20 +364,45 @@ namespace Soup.Game
 
         private int RelicSlotCount => relicSlots != null ? relicSlots.Length : 0;
 
-        private static int OwnedRelicCount =>
-            RelicManager.Instance != null ? RelicManager.Instance.Owned.Count : 0;
+        /// <summary>Unique relic types owned (duplicates stack into ×N on one slot).</summary>
+        private int OwnedRelicTypeCount
+        {
+            get
+            {
+                RebuildUniqueRelics();
+                return _uniqueRelics.Count;
+            }
+        }
 
-        private static int RelicMaxStart(int ownedCount, int slotCount) =>
-            slotCount <= 0 ? 0 : Mathf.Max(0, ownedCount - slotCount);
+        private static int RelicPageStep(int slotCount) => Mathf.Max(1, slotCount);
+
+        /// <summary>最后一页起点：按整排对齐（例如 6 格时为 0, 6, 12…）。</summary>
+        private static int RelicMaxStart(int ownedTypeCount, int slotCount)
+        {
+            if (slotCount <= 0 || ownedTypeCount <= slotCount)
+                return 0;
+            int pages = Mathf.CeilToInt(ownedTypeCount / (float)slotCount);
+            return (pages - 1) * slotCount;
+        }
+
+        private void RebuildUniqueRelics()
+        {
+            _uniqueRelics.Clear();
+            RelicManager.Instance?.CopyOwnedUnique(_uniqueRelics);
+        }
 
         private void RefreshRelics()
         {
             if (relicSlots == null) return;
-            var relics = RelicManager.Instance != null ? RelicManager.Instance.Owned : null;
-            int ownedCount = relics != null ? relics.Count : 0;
+            EnsureRelicStackLabels();
+            RebuildUniqueRelics();
+
+            int ownedTypeCount = _uniqueRelics.Count;
             int slotCount = relicSlots.Length;
-            int maxStart = RelicMaxStart(ownedCount, slotCount);
-            _relicStart = Mathf.Clamp(_relicStart, 0, maxStart);
+            int maxStart = RelicMaxStart(ownedTypeCount, slotCount);
+            int step = RelicPageStep(slotCount);
+            // 持有变化后仍对齐到整排。
+            _relicStart = Mathf.Clamp((_relicStart / step) * step, 0, maxStart);
 
             if (relicPrevButton != null)
                 relicPrevButton.interactable = _relicStart > 0;
@@ -377,19 +415,35 @@ namespace Soup.Game
                 if (slot == null) continue;
 
                 int relicIndex = _relicStart + i;
-                RelicItem relic = relics != null && relicIndex < ownedCount ? relics[relicIndex] : null;
+                RelicItem relic = relicIndex < ownedTypeCount ? _uniqueRelics[relicIndex] : null;
+                Text stackLabel = i < _relicStackLabels.Count ? _relicStackLabels[i] : null;
+
                 if (relic != null)
                 {
                     slot.sprite = relic.Icon != null ? relic.Icon : GetRelicPlaceholderSprite();
                     slot.color = Color.white;
                     slot.enabled = true;
                     slot.preserveAspect = true;
+
+                    int stacks = RelicManager.Instance != null
+                        ? RelicManager.Instance.CountOwned(relic)
+                        : 1;
+                    if (stackLabel != null)
+                    {
+                        stackLabel.gameObject.SetActive(stacks > 1);
+                        stackLabel.text = stacks > 1 ? $"×{stacks}" : string.Empty;
+                    }
                 }
                 else
                 {
                     slot.sprite = null;
                     slot.color = new Color(1f, 1f, 1f, 0f);
                     slot.enabled = true;
+                    if (stackLabel != null)
+                    {
+                        stackLabel.text = string.Empty;
+                        stackLabel.gameObject.SetActive(false);
+                    }
                 }
             }
         }
@@ -399,15 +453,15 @@ namespace Soup.Game
             EnsureRelicTooltipUi();
             if (_relicTooltip == null || anchor == null) return;
 
-            var relics = RelicManager.Instance != null ? RelicManager.Instance.Owned : null;
+            RebuildUniqueRelics();
             int relicIndex = _relicStart + slotIndex;
-            if (relics == null || relicIndex < 0 || relicIndex >= relics.Count)
+            if (relicIndex < 0 || relicIndex >= _uniqueRelics.Count)
             {
                 HideRelicTooltip();
                 return;
             }
 
-            var relic = relics[relicIndex];
+            var relic = _uniqueRelics[relicIndex];
             if (relic == null)
             {
                 HideRelicTooltip();
@@ -416,13 +470,27 @@ namespace Soup.Game
 
             int stacks = RelicManager.Instance != null ? RelicManager.Instance.CountOwned(relic) : 1;
             string title = stacks > 1 ? $"{relic.DisplayName} ×{stacks}" : relic.DisplayName;
-            string body = !string.IsNullOrWhiteSpace(relic.Description)
-                ? relic.Description.Trim()
-                : relic.GetRulesSummary();
+            string body = relic.GetEffectDisplayText(stacks);
             _relicTooltip.Show(title, body, anchor);
         }
 
         public void HideRelicTooltip() => _relicTooltip?.Hide();
+
+        public void OnRelicSlotClicked(int slotIndex)
+        {
+            RebuildUniqueRelics();
+            int relicIndex = _relicStart + slotIndex;
+            if (relicIndex < 0 || relicIndex >= _uniqueRelics.Count)
+                return;
+
+            var relic = _uniqueRelics[relicIndex];
+            if (relic == null)
+                return;
+
+            HideRelicTooltip();
+            HoverTooltipHub.HideIfPresent();
+            RelicPreviewOverlayUI.Ensure().Show(relic);
+        }
 
         private void EnsureRelicTooltipUi()
         {
@@ -431,6 +499,137 @@ namespace Soup.Game
             if (_relicTooltip == null)
                 _relicTooltip = gameObject.AddComponent<RelicHudTooltip>();
             _relicTooltip.EnsureBuilt(transform, GameOverlayUI.SharedUiFont());
+            _relicTooltip.EnsureTopMost(5000);
+        }
+
+        private void EnsureRelicStackLabels()
+        {
+            if (relicSlots == null) return;
+            while (_relicStackLabels.Count < relicSlots.Length)
+                _relicStackLabels.Add(null);
+
+            var relicBar = FindNamed(transform, "RelicBar") as RectTransform;
+            // Bright amber so ×N pops on the gray relic strip.
+            var stackColor = new Color(1f, 0.85f, 0.12f, 1f);
+
+            // Slots are siblings of RelicBar and draw on top of it — reparent under RelicBar
+            // so stack labels parented there can sit above the circles and still on the gray strip.
+            if (relicBar != null)
+            {
+                for (int s = 0; s < relicSlots.Length; s++)
+                {
+                    var icon = relicSlots[s];
+                    if (icon == null) continue;
+                    var frame = icon.transform.parent as RectTransform;
+                    if (frame == null) continue;
+                    if (frame.parent != relicBar)
+                        frame.SetParent(relicBar, true);
+                }
+            }
+
+            for (int i = 0; i < relicSlots.Length; i++)
+            {
+                var icon = relicSlots[i];
+                if (icon == null) continue;
+
+                var frame = icon.transform.parent != null ? icon.transform.parent : icon.transform;
+                var frameRect = frame as RectTransform;
+                if (frameRect == null)
+                    frameRect = icon.rectTransform;
+
+                // Remove legacy labels stuck on the circle frame.
+                var legacy = frame.Find("StackCount");
+                if (legacy != null)
+                    Destroy(legacy.gameObject);
+
+                Text label = _relicStackLabels[i];
+                Transform host = relicBar != null ? (Transform)relicBar : frame;
+                if (label == null)
+                {
+                    var existing = host.Find($"StackCount_{i}");
+                    label = existing != null ? existing.GetComponent<Text>() : null;
+                    if (label == null)
+                    {
+                        var go = new GameObject($"StackCount_{i}", typeof(RectTransform));
+                        go.transform.SetParent(host, false);
+                        label = go.AddComponent<Text>();
+                        label.raycastTarget = false;
+                        label.horizontalOverflow = HorizontalWrapMode.Overflow;
+                        label.verticalOverflow = VerticalWrapMode.Overflow;
+
+                        var outline = go.AddComponent<Outline>();
+                        outline.effectColor = new Color(0.05f, 0.04f, 0.02f, 0.95f);
+                        outline.effectDistance = new Vector2(1.5f, -1.5f);
+                    }
+
+                    _relicStackLabels[i] = label;
+                }
+
+                label.font = GameOverlayUI.SharedUiFont();
+                label.fontSize = 20;
+                label.fontStyle = FontStyle.Bold;
+                label.alignment = TextAnchor.LowerRight;
+                label.color = stackColor;
+
+                // 独立 Canvas，排序高于 HUD，保证画在灰色 RelicBar 与图标之上。
+                var labelCanvas = label.GetComponent<Canvas>();
+                if (labelCanvas == null)
+                    labelCanvas = label.gameObject.AddComponent<Canvas>();
+                labelCanvas.overrideSorting = true;
+                int hudOrder = 150;
+                // GetComponentInParent 会先命中自身，取真正的上级 HUD Canvas。
+                var canvases = label.GetComponentsInParent<Canvas>(true);
+                for (int c = 0; c < canvases.Length; c++)
+                {
+                    if (canvases[c] != null && canvases[c] != labelCanvas)
+                    {
+                        hudOrder = canvases[c].sortingOrder;
+                        break;
+                    }
+                }
+                labelCanvas.sortingOrder = hudOrder + 25;
+
+                var rt = label.rectTransform;
+                if (label.transform.parent != host)
+                    label.transform.SetParent(host, false);
+
+                if (relicBar != null)
+                {
+                    var canvas = relicBar.GetComponentInParent<Canvas>();
+                    Camera cam = null;
+                    if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                        cam = canvas.worldCamera;
+
+                    // 锚在图标右下内侧，再上移，落在灰框正面内。
+                    Vector3 world = frameRect.TransformPoint(
+                        new Vector3(frameRect.rect.xMax - 2f, frameRect.rect.yMin + 22f, 0f));
+                    Vector2 screen = RectTransformUtility.WorldToScreenPoint(cam, world);
+                    Vector2 local;
+                    RectTransformUtility.ScreenPointToLocalPointInRectangle(relicBar, screen, cam, out local);
+
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.pivot = new Vector2(1f, 0f);
+                    rt.sizeDelta = new Vector2(48f, 26f);
+
+                    float y = local.y + 10f;
+                    float barMin = relicBar.rect.yMin + 4f;
+                    float barMax = relicBar.rect.yMax - 2f;
+                    y = Mathf.Clamp(y, barMin, barMax - 10f);
+                    rt.anchoredPosition = new Vector2(local.x + 2f, y);
+                }
+                else
+                {
+                    rt.anchorMin = new Vector2(1f, 0f);
+                    rt.anchorMax = new Vector2(1f, 0f);
+                    rt.pivot = new Vector2(1f, 0f);
+                    rt.anchoredPosition = new Vector2(-2f, 10f);
+                    rt.sizeDelta = new Vector2(48f, 26f);
+                }
+
+                label.transform.SetAsLastSibling();
+                label.gameObject.SetActive(false);
+            }
         }
 
         private void EnsureRelicSlotHovers()
@@ -458,8 +657,39 @@ namespace Soup.Game
             _relicHoversReady = true;
         }
 
+        private void EnsureRelicSlotClicks()
+        {
+            if (_relicClicksReady || relicSlots == null) return;
+
+            for (int i = 0; i < relicSlots.Length; i++)
+            {
+                var icon = relicSlots[i];
+                if (icon == null) continue;
+
+                var frame = icon.transform.parent;
+                if (frame == null) continue;
+
+                var frameImage = frame.GetComponent<Image>();
+                if (frameImage != null)
+                    frameImage.raycastTarget = true;
+
+                var click = frame.GetComponent<RelicSlotClick>();
+                if (click == null)
+                    click = frame.gameObject.AddComponent<RelicSlotClick>();
+                click.Bind(this, i);
+            }
+
+            _relicClicksReady = true;
+        }
+
         private void EnsureFlavorAndEmployeeHovers()
         {
+            BindResourceHover(softValue, "Soft");
+            BindResourceHover(toughValue, "Tough");
+            BindResourceHover(solidValue, "Solid");
+            BindResourceHover(processedValue, "Processed");
+            BindResourceHover(cookedValue, "Cooked");
+
             BindFlavorHover(spicyValue, FlavorType.Spicy);
             BindFlavorHover(coldValue, FlavorType.Cold);
             BindFlavorHover(sourValue, FlavorType.Sour);
@@ -498,15 +728,110 @@ namespace Soup.Game
             HudResourceIconApplier.ApplyAll(transform, art);
         }
 
+        private void EnsureEmployeeSwitchHint()
+        {
+            if (employeeSwitchHint == null)
+                employeeSwitchHint = FindText(transform, "EmployeeSwitchHint");
+
+            var frameTf = FindNamed(transform, "EmployeeFrame") as RectTransform;
+            if (frameTf == null)
+                return;
+
+            if (employeeSwitchHint == null)
+            {
+                var go = new GameObject("EmployeeSwitchHint", typeof(RectTransform));
+                go.transform.SetParent(frameTf.parent, false);
+                employeeSwitchHint = go.AddComponent<Text>();
+            }
+
+            LayoutEmployeeSwitchHint(employeeSwitchHint.rectTransform, frameTf);
+            StyleEmployeeSwitchHint(employeeSwitchHint);
+            employeeSwitchHint.transform.SetAsLastSibling();
+        }
+
+        private static void LayoutEmployeeSwitchHint(RectTransform hintRt, RectTransform frameTf)
+        {
+            if (hintRt == null || frameTf == null) return;
+
+            if (hintRt.parent != frameTf.parent)
+                hintRt.SetParent(frameTf.parent, false);
+
+            hintRt.anchorMin = Vector2.zero;
+            hintRt.anchorMax = Vector2.zero;
+            hintRt.pivot = new Vector2(0.5f, 0f);
+            float topY = frameTf.anchoredPosition.y + frameTf.sizeDelta.y * 0.5f;
+            hintRt.anchoredPosition = new Vector2(frameTf.anchoredPosition.x, topY - 10f);
+            hintRt.sizeDelta = new Vector2(200f, 32f);
+        }
+
+        private static void StyleEmployeeSwitchHint(Text text)
+        {
+            if (text == null) return;
+
+            text.text = "点击切换员工类型";
+            text.font = GameOverlayUI.SharedUiFont();
+            text.fontSize = 14;
+            text.fontStyle = FontStyle.Normal;
+            text.alignment = TextAnchor.LowerCenter;
+            text.color = Color.black;
+            text.raycastTarget = false;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+        }
+
+        private static void BindResourceHover(Text value, string key)
+        {
+            if (value == null) return;
+            BindNameOnlyHover(ResolveCounterHoverHost(value), HoverTooltipText.HudResourceTitle(key));
+        }
+
         private static void BindFlavorHover(Text value, FlavorType type)
         {
             if (value == null) return;
-            Transform host = value.transform.parent != null ? value.transform.parent : value.transform;
+            BindHover(
+                ResolveCounterHoverHost(value),
+                () =>
+                {
+                    HoverTooltipText.Flavor(type, out string title, out string body);
+                    return (title, body);
+                });
+        }
+
+        private static Transform ResolveCounterHoverHost(Text value)
+        {
+            var parent = value.transform.parent;
+            if (parent != null
+                && (parent.name.StartsWith("Circle_") || parent.name.StartsWith("Square_")))
+                return parent;
+            return parent != null ? parent : value.transform;
+        }
+
+        private static void BindHover(Transform host, System.Func<(string title, string body)> provider)
+        {
+            if (host == null || provider == null) return;
+
+            var graphic = host.GetComponent<Graphic>();
+            if (graphic != null)
+                graphic.raycastTarget = true;
+
             var tip = host.GetComponent<UiHoverTooltip>();
             if (tip == null)
                 tip = host.gameObject.AddComponent<UiHoverTooltip>();
-            HoverTooltipText.Flavor(type, out string title, out string body);
-            tip.Bind(title, body);
+            tip.Bind(() => provider().title, () => provider().body);
+        }
+
+        private static void BindNameOnlyHover(Transform host, string title)
+        {
+            if (host == null || string.IsNullOrWhiteSpace(title)) return;
+
+            var graphic = host.GetComponent<Graphic>();
+            if (graphic != null)
+                graphic.raycastTarget = true;
+
+            var tip = host.GetComponent<UiHoverTooltip>();
+            if (tip == null)
+                tip = host.gameObject.AddComponent<UiHoverTooltip>();
+            tip.Bind(title, string.Empty);
         }
 
         private static void RefreshStationLabels()
@@ -572,6 +897,7 @@ namespace Soup.Game
             magicValue = FindText(root, "Value_Magic");
 
             employeeCount = FindText(root, "Value_Employee");
+            employeeSwitchHint = FindText(root, "EmployeeSwitchHint");
             var avatarTf = FindNamed(root, "EmployeeAvatar");
             var frameTf = FindNamed(root, "EmployeeFrame");
             if (avatarTf != null)

@@ -62,13 +62,6 @@ namespace Soup.Events.Editor
             var incentive = LoadRelic("incentive");
 
             var ghost = EnsureEmployee("ghost", "幽灵", 0.8f, occupiesJobSlot: false, canPlayerAssign: true, lockedJob: null);
-            var mushroomPerson = EnsureEmployee(
-                "mushroom_person",
-                "蘑菇人",
-                1.5f,
-                occupiesJobSlot: true,
-                canPlayerAssign: false,
-                lockedJob: FindJobByDisplayName("蘑菇"));
             var otherworldHero = EnsureEmployee(
                 "otherworld_hero",
                 "异世界勇者",
@@ -86,12 +79,6 @@ namespace Soup.Events.Editor
                 restrictToJobType: true,
                 allowedJobType: JobType.Process,
                 consumeOwnProcessedFraction: 0.1f);
-
-            var jobMushroom = FindJobByDisplayName("蘑菇");
-            var jobBerry = FindJobByDisplayName("小甜果");
-            var jobSpiky = FindJobByDisplayName("小刺球");
-            var jobMagicLeaf = FindJobByDisplayName("魔法叶");
-            var jobIceFruit = FindJobByDisplayName("冰晶果");
 
             // —— 一般事件 ——
 
@@ -140,7 +127,7 @@ namespace Soup.Events.Editor
                 EventTriggerMoment.AfterStage,
                 requiredStage: 0,
                 weight: 1f,
-                canRepeat: true,
+                canRepeat: false,
                 relatedJob: null,
                 opt =>
                 {
@@ -178,7 +165,7 @@ namespace Soup.Events.Editor
                 EventTriggerMoment.AfterStage,
                 requiredStage: 0,
                 weight: 1f,
-                canRepeat: true,
+                canRepeat: false,
                 relatedJob: null,
                 opt =>
                 {
@@ -246,13 +233,13 @@ namespace Soup.Events.Editor
                 EventTriggerMoment.AfterStage,
                 requiredStage: 0,
                 weight: 1f,
-                canRepeat: true,
+                canRepeat: false,
                 relatedJob: null,
                 opt =>
                 {
-                    opt.SetLabel("命令小精灵连夜清扫——获得2个 厨房事故，1个 处理苔藓");
+                    opt.SetLabel("命令小精灵连夜清扫——获得2个 疲倦，1个 处理苔藓");
                     opt.ClearEffects();
-                    AddGrantRelicStacks(opt, kitchenAccident, 2);
+                    AddGrantRelicStacks(opt, fatigue, 2);
                     var e3 = new EventEffect();
                     e3.SetGrantRelic(handleMoss);
                     opt.AddEffect(e3);
@@ -278,7 +265,7 @@ namespace Soup.Events.Editor
                 EventTriggerMoment.AfterStage,
                 requiredStage: 0,
                 weight: 1f,
-                canRepeat: true,
+                canRepeat: false,
                 relatedJob: null,
                 opt =>
                 {
@@ -306,7 +293,7 @@ namespace Soup.Events.Editor
                 EventTriggerMoment.AfterStage,
                 requiredStage: 0,
                 weight: 1f,
-                canRepeat: true,
+                canRepeat: false,
                 relatedJob: null,
                 opt =>
                 {
@@ -364,7 +351,7 @@ namespace Soup.Events.Editor
                 EventTriggerMoment.AfterStage,
                 requiredStage: 0,
                 weight: 1f,
-                canRepeat: true,
+                canRepeat: false,
                 relatedJob: null,
                 opt =>
                 {
@@ -392,7 +379,7 @@ namespace Soup.Events.Editor
                 EventTriggerMoment.AfterStage,
                 requiredStage: 0,
                 weight: 1f,
-                canRepeat: true,
+                canRepeat: false,
                 relatedJob: null,
                 opt =>
                 {
@@ -407,150 +394,6 @@ namespace Soup.Events.Editor
                     opt.SetLabel("组建鬼杀队——获得2个 激励");
                     opt.ClearEffects();
                     AddGrantRelicStacks(opt, incentive, 2);
-                });
-
-            // —— 进阶专属事件 ——
-
-            CreateOrUpdate(
-                db,
-                "spore_infection",
-                "孢子感染",
-                "你发现最近从事蘑菇采集的小精灵变得有一些奇怪，他们的皮肤变蓝，甚至长出了小蘑菇",
-                EventCategory.AdvancedExclusive,
-                EventTriggerMoment.AfterStage,
-                requiredStage: 0,
-                weight: 1f,
-                canRepeat: true,
-                relatedJob: jobMushroom,
-                opt =>
-                {
-                    opt.SetLabel("立即开始隔离，优化采集流程——蘑菇岗位采集上限减五，产量增加30%");
-                    opt.ClearEffects();
-                    AddModifyJobMaxWorkers(opt, jobMushroom, -5);
-                    AddModifyJobYieldBonus(opt, jobMushroom, 0.3f);
-                },
-                opt =>
-                {
-                    opt.SetLabel("不管，继续采集——小精灵减4，获得3个员工 蘑菇人");
-                    opt.ClearEffects();
-                    var e1 = new EventEffect();
-                    e1.Set(EventEffectType.AddElves, -4);
-                    opt.AddEffect(e1);
-                    var e2 = new EventEffect();
-                    e2.SetAddEmployee(mushroomPerson, 3);
-                    opt.AddEffect(e2);
-                },
-                opt =>
-                {
-                    opt.SetLabel("开发解药——获得1个 激励");
-                    opt.ClearEffects();
-                    AddGrantRelicStacks(opt, incentive, 1);
-                });
-
-            CreateOrUpdate(
-                db,
-                "tasty_berry",
-                "好吃的小甜果",
-                "小甜果，好吃，爱吃，当你发现的时候，有几个小精灵甚至因为偷吃的太多，连路都走不动了",
-                EventCategory.AdvancedExclusive,
-                EventTriggerMoment.AfterStage,
-                requiredStage: 0,
-                weight: 1f,
-                canRepeat: true,
-                relatedJob: jobBerry,
-                opt =>
-                {
-                    opt.SetLabel("狠狠的惩罚他们——小甜果产量增加30%，获得2个 疲倦");
-                    opt.ClearEffects();
-                    AddModifyJobYieldBonus(opt, jobBerry, 0.3f);
-                    AddGrantRelicStacks(opt, fatigue, 2);
-                },
-                opt =>
-                {
-                    opt.SetLabel("多吃一点也不怕——小甜果产量减20%，获得3个 激励");
-                    opt.ClearEffects();
-                    AddModifyJobYieldBonus(opt, jobBerry, -0.2f);
-                    AddGrantRelicStacks(opt, incentive, 3);
-                });
-
-            CreateOrUpdate(
-                db,
-                "ouch_hurt",
-                "啊，好痛！",
-                "有个小精灵在小刺球采集场里唱歌，唱的太难听了，小刺球们都抓狂了，开始攻击小精灵",
-                EventCategory.AdvancedExclusive,
-                EventTriggerMoment.AfterStage,
-                requiredStage: 0,
-                weight: 1f,
-                canRepeat: true,
-                relatedJob: jobSpiky,
-                opt =>
-                {
-                    opt.SetLabel("把唱歌的人打一顿——小刺球产量加10%");
-                    opt.ClearEffects();
-                    AddModifyJobYieldBonus(opt, jobSpiky, 0.1f);
-                },
-                opt =>
-                {
-                    opt.SetLabel("必须让你们见识一下什么是真正的音乐——50%小精灵数量减3，50%小刺球产量加40%");
-                    opt.ClearEffects();
-                    AddChanceElfDeltaOrJobYield(opt, jobSpiky, -3, 0.4f);
-                });
-
-            CreateOrUpdate(
-                db,
-                "god_said_magic_leaf",
-                "神说，要有魔法叶",
-                "你看到一群小精灵围着魔法叶跳舞，嘴里叽里咕噜不知道说什么，他们肯定是被这该死的叶子蛊惑了。",
-                EventCategory.AdvancedExclusive,
-                EventTriggerMoment.AfterStage,
-                requiredStage: 0,
-                weight: 1f,
-                canRepeat: true,
-                relatedJob: jobMagicLeaf,
-                opt =>
-                {
-                    opt.SetLabel("异端！净化！——永久失去魔法叶采集岗位，获得5个 激励");
-                    opt.ClearEffects();
-                    AddDestroyGatherJob(opt, jobMagicLeaf);
-                    AddGrantRelicStacks(opt, incentive, 5);
-                },
-                opt =>
-                {
-                    opt.SetLabel("于是就有了魔法叶——魔法叶可以同时生产四种风味，获得5个 疲倦");
-                    opt.ClearEffects();
-                    AddEnableJobAllFourFlavors(opt, jobMagicLeaf);
-                    AddGrantRelicStacks(opt, fatigue, 5);
-                },
-                opt =>
-                {
-                    opt.SetLabel("把他们全部打一顿——获得1个 激励");
-                    opt.ClearEffects();
-                    AddGrantRelicStacks(opt, incentive, 1);
-                });
-
-            CreateOrUpdate(
-                db,
-                "cold_joke",
-                "冷笑话",
-                "一名小精灵认为给冰晶果讲冷笑话能促进寒冷风味产出，经过测试，发现他讲的冷笑话确实很冷",
-                EventCategory.AdvancedExclusive,
-                EventTriggerMoment.AfterStage,
-                requiredStage: 0,
-                weight: 1f,
-                canRepeat: true,
-                relatedJob: jobIceFruit,
-                opt =>
-                {
-                    opt.SetLabel("让他去讲——冰晶果食材产量减20，风味产量加10点");
-                    opt.ClearEffects();
-                    AddModifyJobRawAndColdPerUnit(opt, jobIceFruit, -20, 10);
-                },
-                opt =>
-                {
-                    opt.SetLabel("呵呵——获得1个 激励");
-                    opt.ClearEffects();
-                    AddGrantRelicStacks(opt, incentive, 1);
                 });
 
             SeedBlessingGoddess(
@@ -576,6 +419,8 @@ namespace Soup.Events.Editor
                 requiredStage: 4,
                 abundanceBlessing,
                 incentive);
+
+            RemoveRetiredAdvancedEvents(db);
 
             EditorUtility.SetDirty(db);
             AssetDatabase.SaveAssets();
@@ -620,12 +465,12 @@ namespace Soup.Events.Editor
                 },
                 opt =>
                 {
-                    opt.SetLabel("我希望手下人干劲满满——消除所有 疲倦，获得一个 激励");
+                    opt.SetLabel("我希望手下人干劲满满——消除所有 疲倦，获得两个 激励");
                     opt.ClearEffects();
                     var clear = new EventEffect();
                     clear.SetRemoveAllFatigue();
                     opt.AddEffect(clear);
-                    AddGrantRelicStacks(opt, incentive, 1);
+                    AddGrantRelicStacks(opt, incentive, 2);
                 });
 
             var path = $"{EventFolder}/Event_{id}.asset";
@@ -657,55 +502,6 @@ namespace Soup.Events.Editor
             }
         }
 
-        private static void AddModifyJobYieldBonus(EventOption opt, JobItem job, float bonus)
-        {
-            if (opt == null || job == null || Mathf.Approximately(bonus, 0f)) return;
-            var e = new EventEffect();
-            e.SetModifyJobYieldBonus(job, bonus);
-            opt.AddEffect(e);
-        }
-
-        private static void AddModifyJobMaxWorkers(EventOption opt, JobItem job, int delta)
-        {
-            if (opt == null || job == null || delta == 0) return;
-            var e = new EventEffect();
-            e.SetModifyJobMaxWorkers(job, delta);
-            opt.AddEffect(e);
-        }
-
-        private static void AddModifyJobRawAndColdPerUnit(EventOption opt, JobItem job, int rawDelta, int coldDelta)
-        {
-            if (opt == null || job == null) return;
-            if (rawDelta == 0 && coldDelta == 0) return;
-            var e = new EventEffect();
-            e.SetModifyJobRawAndColdPerUnit(job, rawDelta, coldDelta);
-            opt.AddEffect(e);
-        }
-
-        private static void AddEnableJobAllFourFlavors(EventOption opt, JobItem job)
-        {
-            if (opt == null || job == null) return;
-            var e = new EventEffect();
-            e.SetEnableJobAllFourFlavors(job);
-            opt.AddEffect(e);
-        }
-
-        private static void AddDestroyGatherJob(EventOption opt, JobItem job)
-        {
-            if (opt == null || job == null) return;
-            var e = new EventEffect();
-            e.SetDestroyGatherJob(job);
-            opt.AddEffect(e);
-        }
-
-        private static void AddChanceElfDeltaOrJobYield(EventOption opt, JobItem job, int elfDelta, float yieldBonus)
-        {
-            if (opt == null || job == null) return;
-            var e = new EventEffect();
-            e.SetChanceElfDeltaOrJobYield(job, elfDelta, yieldBonus);
-            opt.AddEffect(e);
-        }
-
         private static RelicItem EnsureRelic(string id, string displayName)
         {
             // Prefer fully seeded relics; fall back to stub only if missing.
@@ -735,6 +531,30 @@ namespace Soup.Events.Editor
             db.Add(item);
             EditorUtility.SetDirty(db);
             return item;
+        }
+
+        private static void RemoveRetiredAdvancedEvents(EventDatabase db)
+        {
+            string[] retiredIds =
+            {
+                "spore_infection",
+                "tasty_berry",
+                "ouch_hurt",
+                "god_said_magic_leaf",
+                "cold_joke",
+            };
+
+            for (int i = 0; i < retiredIds.Length; i++)
+            {
+                string id = retiredIds[i];
+                var item = db.GetById(id);
+                if (item != null)
+                    db.Remove(item);
+
+                string path = $"{EventFolder}/Event_{id}.asset";
+                if (AssetDatabase.LoadAssetAtPath<EventItem>(path) != null)
+                    AssetDatabase.DeleteAsset(path);
+            }
         }
 
         private static EmployeeItem EnsureEmployee(
@@ -787,22 +607,6 @@ namespace Soup.Events.Editor
             db.Add(item);
             EditorUtility.SetDirty(db);
             return item;
-        }
-
-        private static JobItem FindJobByDisplayName(string displayName)
-        {
-            if (string.IsNullOrWhiteSpace(displayName)) return null;
-            var guids = AssetDatabase.FindAssets("t:JobItem");
-            for (int i = 0; i < guids.Length; i++)
-            {
-                var path = AssetDatabase.GUIDToAssetPath(guids[i]);
-                var job = AssetDatabase.LoadAssetAtPath<JobItem>(path);
-                if (job != null && job.DisplayName == displayName)
-                    return job;
-            }
-
-            Debug.LogWarning($"[事件管理器] 未找到岗位「{displayName}」，进阶专属事件将缺少 relatedJob。");
-            return null;
         }
 
         private static void CreateOrUpdate(

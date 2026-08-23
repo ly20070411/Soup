@@ -29,6 +29,9 @@ namespace Soup.Jobs
         /// <summary>采集开局固定岗位。</summary>
         public const string StartingGatherJobId = "mushroom";
 
+        /// <summary>快乐坨坨采集岗（我爱坨坨等效果的目标形态）。</summary>
+        public const string HappyTuotuoJobId = "happy_tuotuo";
+
         /// <summary>采集新增岗位时，从锁定池中抽出几个供选择（开局 / 换岗 offer）。</summary>
         public const int GatherNewJobOfferCount = 2;
 

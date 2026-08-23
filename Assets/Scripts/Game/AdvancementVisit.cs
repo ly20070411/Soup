@@ -63,6 +63,8 @@ namespace Soup.Game
         {
             IsActive = true;
             Zone = zone;
+            var session = LevelManager.Instance?.ClearRewards;
+            session?.EnsureUnlockOffers(JobTypeFor(zone));
         }
 
         public static void Clear()

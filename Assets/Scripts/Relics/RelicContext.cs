@@ -20,7 +20,7 @@ namespace Soup.Relics
         public float FinalMultiplier { get; set; } = 1f;
         public float IndependentMultiplier { get; set; } = 1f;
         public bool SpicyUncapped { get; set; }
-        public float SpicyMultiplierCap { get; set; } = 3f;
+        public float SpicyMultiplierCap { get; set; }
         /// <summary>Added to spicy bonus score mult (job advance + relics), e.g. 0.5 → ×1.5.</summary>
         public float SpicyScoreMultiplierBonus { get; set; }
         public int LevelTurnNumber { get; set; } = 1;
