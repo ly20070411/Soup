@@ -455,7 +455,8 @@ namespace Soup.Events
             if (countAsRandomTurnEvent)
             {
                 int turn = TurnManager.Instance != null ? TurnManager.Instance.TurnIndex : 0;
-                _lastRandomEventTurn = Mathf.Max(1, turn);
+                // 记录真实回合号（0 = 开局第一回合前），避免冷却窗口多算 1 回合。
+                _lastRandomEventTurn = Mathf.Max(0, turn);
             }
 
             EventPresented?.Invoke(eventItem);

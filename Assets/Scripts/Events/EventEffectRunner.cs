@@ -32,7 +32,9 @@ namespace Soup.Events
                     GrantIncentiveStacks(effect);
                     break;
                 case EventEffectType.GrantRelic:
-                    GrantRelicStacks(effect.RelicReference, Mathf.Max(1, effect.IntValue));
+                    if (effect.IntValue <= 0)
+                        break;
+                    GrantRelicStacks(effect.RelicReference, effect.IntValue);
                     break;
                 case EventEffectType.AddEmployee:
                     if (effect.EmployeeReference != null && effect.IntValue != 0)

@@ -173,8 +173,12 @@ namespace Soup.Relics
                 for (int i = 0; i < relicIds.Count; i++)
                 {
                     var relic = GetById(relicIds[i]);
-                    if (relic != null)
-                        _owned.Add(relic);
+                    if (relic == null) continue;
+                    // 与 Acquire 一致：非 AllowMultiple 遗物恢复时去重，
+                    // 避免损坏存档重复持有导致效果按件数叠加。
+                    if (!relic.AllowMultiple && (_owned.Contains(relic) || HasId(relic.Id)))
+                        continue;
+                    _owned.Add(relic);
                 }
             }
             finally

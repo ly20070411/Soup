@@ -43,8 +43,21 @@ namespace Soup.Items
 
                 if (_byId.ContainsKey(key))
                 {
-                    Debug.LogWarning($"[IngredientDatabase] Duplicate id '{key}' on {item.name}. Keeping first entry.", this);
-                    continue;
+                    // 同名条目（displayName 相同 → SanitizeId 相同）会导致第二个永久查不到：
+                    // 追加确定性后缀生成唯一 id，保证两个条目都可被 id 查询命中。
+                    int suffix = 2;
+                    string unique;
+                    do
+                    {
+                        unique = key + "_" + suffix;
+                        suffix++;
+                    } while (_byId.ContainsKey(unique));
+
+                    item.SetIdentity(unique, item.DisplayName);
+                    Debug.LogWarning(
+                        $"[IngredientDatabase] Duplicate id '{key}' on {item.name}; " +
+                        $"renamed to '{unique}'. Adjust display names if this was unintended.", this);
+                    key = unique;
                 }
 
                 _byId.Add(key, item);

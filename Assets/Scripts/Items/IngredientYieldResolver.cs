@@ -29,7 +29,8 @@ namespace Soup.Items
 
         public IngredientYield ScaledBy(int units)
         {
-            if (units <= 1) return this;
+            if (units <= 0) return default;
+            if (units == 1) return this;
             return new IngredientYield
             {
                 Soft = Soft * units,

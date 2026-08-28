@@ -581,14 +581,14 @@ namespace Soup.Levels
             var events = EventManager.Instance;
             if (events == null)
             {
-                EventsClaimed = true;
-                message = "无事件可领取";
-                AfterClaim();
-                return true;
+                // 与 TryClaimWarehouse 一致：管理器未就绪时不标记已领取，
+                // 避免初始化时序异常导致本关事件位永久作废。
+                message = "事件管理器未就绪，请稍后再领取";
+                return false;
             }
 
             // Already presenting this clear's event batch — wait for player choices.
-            if (events.HasPendingEvent || events.HasStageEventBatch)
+            if (events.HasPendingEvent || events.HasStageEventBatch || events.QueuedEventCount > 0)
             {
                 message = "请先完成当前事件选择";
                 return false;

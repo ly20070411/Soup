@@ -24,6 +24,12 @@ namespace Soup.Employees
                 var selected = em.GetById(_typeId);
                 if (selected != null && selected.CanPlayerAssign)
                     return selected;
+
+                // 当前 _typeId 指向不可分配类型（如蘑菇人）时回退精灵，
+                // 并同步写回 _typeId，保证 SelectedTypeId 与 Current 一致，
+                // 避免 UI 高亮与实际分配对象错位。
+                if (em.ElfType != null)
+                    _typeId = em.ElfType.Id;
                 return em.ElfType;
             }
         }

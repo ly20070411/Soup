@@ -52,9 +52,12 @@ namespace Soup.Game
         private bool _relicHoversReady;
         private bool _relicClicksReady;
 
+        private float _designScreenHeight = 1080f;
+
         private void Awake()
         {
             AutoBindIfNeeded();
+            NormalizeTopAnchoredHud();
             WireButtons();
             EnsureRelicTooltipUi();
             EnsureRelicSlotHovers();
@@ -62,6 +65,40 @@ namespace Soup.Game
             EnsureFlavorAndEmployeeHovers();
             EnsureResourceFlavorIcons();
             EnsureEmployeeSwitchHint();
+        }
+
+        /// <summary>
+        /// 打包后在 Windows 高 DPI / 非 16:9 分辨率下，场景里所有 HUD 元素都锚定 (0,0)
+        /// 左下角 + 1920×1080 绝对坐标，会整体下移/偏移。这里把它们从「左下角绝对坐标」
+        /// 改为「顶部锚定 + 相对屏幕顶部的偏移」，使顶部资源栏贴合屏幕顶部，不随分辨率漂移。
+        /// 保持水平坐标不变（横向铺满的设计），只校正垂直方向。
+        /// </summary>
+        private void NormalizeTopAnchoredHud()
+        {
+            var hudRt = transform as RectTransform;
+            if (hudRt == null) return;
+            if (hudRt.parent == null) return;
+
+            // 设计分辨率高度。元素 y 坐标从 1920×1080 设计左下角量起。
+            float designH = _designScreenHeight;
+            // 保护：若某元素已在运行时被改为自适应锚点则跳过。
+            foreach (Transform child in hudRt)
+            {
+                var rt = child as RectTransform;
+                if (rt == null) continue;
+                // 只处理仍锚定左下角 (0,0) 的 HUD 元素。
+                if (rt.anchorMin != Vector2.zero || rt.anchorMax != Vector2.zero)
+                    continue;
+
+                // 设计坐标：y 从容器底部量起。改为顶部锚定后，anchoredPosition.y 的基准是
+                // 容器顶部；正值表示在顶部「上方」（屏幕外），负值才是顶部「下方」。
+                // 因此新 y = 原始y - designH（负值）。
+                float anchorY = rt.anchoredPosition.y - designH;
+                // 顶部锚定但保留水平锚点 (0)。x 保持不变。
+                rt.anchorMin = new Vector2(0f, 1f);
+                rt.anchorMax = new Vector2(0f, 1f);
+                rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, anchorY);
+            }
         }
 
         private void OnEnable()

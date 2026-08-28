@@ -68,6 +68,18 @@ namespace Soup.Game
             DrawProceduralFallback();
         }
 
+        /// <summary>
+        /// IMGUI 逻辑坐标 = 物理像素 ÷ DPI 缩放。
+        /// 打包后在 Windows 高 DPI（如 150%）下 Screen 返回物理像素，
+        /// 直接用 Screen.width/height 画全屏 rect 会超出屏幕导致背景错位/露灰边。
+        /// GUI.matrix.m00 即当前 GUI 坐标系的缩放因子（等价于 GUIUtility.pixelsPerPoint）。
+        /// </summary>
+        private static Rect FullScreenRect()
+        {
+            float scale = Mathf.Max(1f, GUI.matrix.m00);
+            return new Rect(0, 0, Screen.width / scale, Screen.height / scale);
+        }
+
         private void DrawAnimatedFrame()
         {
             int index = 0;
@@ -78,7 +90,7 @@ namespace Soup.Game
             }
 
             GUI.DrawTexture(
-                new Rect(0, 0, Screen.width, Screen.height),
+                FullScreenRect(),
                 _frames[index],
                 ScaleMode.ScaleAndCrop);
         }
@@ -92,7 +104,7 @@ namespace Soup.Game
             if (_gradient != null)
             {
                 GUI.DrawTexture(
-                    new Rect(0, 0, Screen.width, Screen.height),
+                    FullScreenRect(),
                     _gradient,
                     ScaleMode.StretchToFill);
             }
@@ -111,13 +123,16 @@ namespace Soup.Game
             float radiusY,
             Color color)
         {
+            float scale = Mathf.Max(1f, GUI.matrix.m00);
+            float w = Screen.width / scale;
+            float h = Screen.height / scale;
             float x = centerX + Mathf.Sin(t * 0.35f) * 0.06f;
             float y = centerY + Mathf.Cos(t * 0.27f) * 0.05f;
             var rect = new Rect(
-                (x - radiusX * 0.5f) * Screen.width,
-                (y - radiusY * 0.5f) * Screen.height,
-                radiusX * Screen.width,
-                radiusY * Screen.height);
+                (x - radiusX * 0.5f) * w,
+                (y - radiusY * 0.5f) * h,
+                radiusX * w,
+                radiusY * h);
 
             var previous = GUI.color;
             GUI.color = color;

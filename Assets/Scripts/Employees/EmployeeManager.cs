@@ -279,8 +279,11 @@ namespace Soup.Employees
             if (totalLabor <= 0f) return 0;
             if (!_assignments.TryGetValue(job.Id, out var map) || map == null) return 0;
 
-            int eaten = 0;
-            foreach (var pair in map)
+            // 快照迭代：GetLaborOnJob 内部会 SyncLockedAssignments → EnforceLockedFill，
+            // 可能修改 _assignments 字典（例如锁定员工配到本岗时），迭代期间修改会抛异常。
+            var snapshot = new List<KeyValuePair<string, int>>(map);
+            float eatenFloat = 0f;
+            foreach (var pair in snapshot)
             {
                 if (pair.Value <= 0) continue;
                 var type = GetById(pair.Key);
@@ -292,9 +295,12 @@ namespace Soup.Employees
                 if (typeLabor <= 0f) continue;
 
                 float ownShare = produced * (typeLabor / totalLabor);
-                eaten += GameMath.CeilToInt(ownShare * fraction);
+                eatenFloat += ownShare * fraction;
             }
 
+            // 按总份额一次性取整，避免逐类型向上取整导致小产出被全额吃掉
+            // （例如产出 1 份、吃 10% 时应留 1 份，而不是吃掉 100%）。
+            int eaten = Mathf.FloorToInt(eatenFloat);
             return Mathf.Clamp(eaten, 0, produced);
         }
 
@@ -423,14 +429,27 @@ namespace Soup.Employees
             if (progression != null && !progression.IsUnlocked(job))
                 return false;
 
-            // Cooking is exclusive: picking a cook station moves/clears player workers from other cooks.
+            // Cooking is exclusive: picking a cook station moves every player-assignable
+            // worker from the other cook stations over, so no employee type is silently
+            // dropped (previously only the selected type was transferred while the rest
+            // were cleared).
             if (job.JobType == JobType.Cook)
             {
-                int fromOther = CountAssignedToOtherCooks(type, job);
-                if (fromOther > 0)
+                var moved = CollectOtherCookAssignments(job);
+                if (moved.Count > 0)
                 {
                     ClearPlayerAssignmentsOnOtherCooks(job);
-                    SetAssignedRaw(type, job, GetAssigned(type, job) + fromOther);
+                    foreach (var kv in moved)
+                    {
+                        var t = GetById(kv.Key);
+                        if (t == null || kv.Value <= 0) continue;
+                        SetAssignedRaw(t, job, GetAssigned(t, job) + kv.Value);
+                    }
+
+                    // 本次请求的分配量照常尝试（受空闲数约束）。
+                    int add = Mathf.Min(amount, Mathf.Max(0, GetFree(type)));
+                    if (add > 0)
+                        SetAssignedRaw(type, job, GetAssigned(type, job) + add);
                     RaiseChanged();
                     return true;
                 }
@@ -755,6 +774,36 @@ namespace Soup.Employees
             }
 
             return sum;
+        }
+
+        /// <summary>
+        /// 收集其他烹饪岗上所有可手动分配的员工（typeId → count）。
+        /// 烹饪互斥转移时用它，保证混合类型（精灵 + 幽灵等）切换火力不丢分配。
+        /// </summary>
+        private Dictionary<string, int> CollectOtherCookAssignments(JobItem keep)
+        {
+            var result = new Dictionary<string, int>();
+            var jobs = JobManager.Instance;
+            if (jobs == null) return result;
+            foreach (var pair in _assignments)
+            {
+                var job = jobs.GetById(pair.Key);
+                if (job == null || job.JobType != JobType.Cook) continue;
+                if (keep != null && ReferenceEquals(job, keep)) continue;
+                if (pair.Value == null) continue;
+
+                foreach (var typePair in pair.Value)
+                {
+                    if (typePair.Value <= 0) continue;
+                    var type = GetById(typePair.Key);
+                    if (type == null || type.HasLockedJob || !type.CanPlayerAssign)
+                        continue;
+                    result.TryGetValue(typePair.Key, out int existing);
+                    result[typePair.Key] = existing + typePair.Value;
+                }
+            }
+
+            return result;
         }
 
         private void ClearPlayerAssignmentsOnOtherCooks(JobItem keep)

@@ -365,7 +365,7 @@ namespace Soup.Game
                 var relicCtx = BuildRelicContext(store, result, gatherOutputs);
 
                 RelicEffectRunner.Run(RelicTrigger.TurnStart, relicCtx);
-                ResolveGather(elves, store, result, relicCtx, gatherOutputs);
+                ResolveGather(elves, store, result, relicCtx, gatherOutputs, preview: true);
                 RelicEffectRunner.Run(RelicTrigger.AfterGather, relicCtx);
                 ResolveProcess(elves, store, result);
                 ShrinkGatherOutputsToStore(gatherOutputs, store);
@@ -405,7 +405,7 @@ namespace Soup.Game
 
                 RelicEffectRunner.Run(RelicTrigger.TurnStart, relicCtx);
                 int solidBeforeGather = store.Solid;
-                ResolveGather(elves, store, result, relicCtx, gatherOutputs);
+                ResolveGather(elves, store, result, relicCtx, gatherOutputs, preview: true);
                 relicCtx.SolidProducedThisBatch = Mathf.Max(0, store.Solid - solidBeforeGather);
                 RelicEffectRunner.Run(RelicTrigger.AfterGather, relicCtx);
                 ResolveProcess(elves, store, result);
@@ -523,7 +523,8 @@ namespace Soup.Game
             ResourceStore store,
             TurnResult result,
             RelicContext relicCtx,
-            List<GatherTurnOutput> gatherOutputs)
+            List<GatherTurnOutput> gatherOutputs,
+            bool preview = false)
         {
             var em = EmployeeManager.Instance;
             var gatheredJobs = new List<JobItem>();
@@ -579,7 +580,7 @@ namespace Soup.Game
                 if (units <= 0) continue;
 
                 float efficiency = WorkEfficiencyResolver.ResolveGatherConversionEfficiency(
-                    job, advanceMods, labor, workers);
+                    job, advanceMods, labor, workers, -1, consumePendingPenalty: !preview);
 
                 var bucket = GetOrCreateOutput(gatherOutputs, job, GetGatherJobNumber(job));
 
@@ -665,7 +666,7 @@ namespace Soup.Game
                     ApplyFlatRandomMaterialBonus(store, result, bucket, advanceMods);
                     ApplyBonusIngredient(store, result, relicCtx, bucket, advanceMods, efficiency);
                     ApplyTopStockBonuses(store, result, bucket, advanceMods);
-                    if (advanceMods.NextTurnGatherEfficiencyPenalty > 0f)
+                    if (!preview && advanceMods.NextTurnGatherEfficiencyPenalty > 0f)
                     {
                         var progression = JobProgressionManager.Instance;
                         if (progression != null)
@@ -685,14 +686,17 @@ namespace Soup.Game
                 ApplyFlatRandomMaterialBonus(store, result, bucket, advanceMods);
                 ApplyBonusIngredient(store, result, relicCtx, bucket, advanceMods, efficiency);
                 ApplyTopStockBonuses(store, result, bucket, advanceMods);
-                if (advanceMods.NextTurnGatherEfficiencyPenalty > 0f && JobProgressionManager.Instance != null)
+                if (!preview && advanceMods.NextTurnGatherEfficiencyPenalty > 0f && JobProgressionManager.Instance != null)
                     JobProgressionManager.Instance.SetPendingGatherEfficiencyPenalty(
                         job, advanceMods.NextTurnGatherEfficiencyPenalty);
             }
 
             ApplyDestroyedGatherGhostOutput(store, result, relicCtx, gatherOutputs);
-            JobProgressionManager.Instance?.RecoverPendingGatherEfficiencyPenaltyForJobsNotGathered(
-                gatheredJobs);
+            if (!preview)
+            {
+                JobProgressionManager.Instance?.RecoverPendingGatherEfficiencyPenaltyForJobsNotGathered(
+                    gatheredJobs);
+            }
         }
 
         private static void ApplyTopStockBonuses(

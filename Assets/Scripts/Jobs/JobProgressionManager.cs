@@ -442,7 +442,11 @@ namespace Soup.Jobs
         public List<JobItem> GetDestroyableGatherJobs(JobItem except)
         {
             var list = GetUnlocked(JobType.Gather);
-            list.RemoveAll(j => j == null || ReferenceEquals(j, except) || IsDestroyedGatherJob(j));
+            // 永久起始岗（蘑菇）不可被献祭/摧毁，与替换流程的 IsPermanentGatherJob 保护一致。
+            list.RemoveAll(j => j == null
+                || ReferenceEquals(j, except)
+                || IsDestroyedGatherJob(j)
+                || IsPermanentGatherJob(j));
             return list;
         }
 
@@ -451,6 +455,7 @@ namespace Soup.Jobs
             if (job == null || job.JobType != JobType.Gather) return false;
             if (!IsUnlocked(job)) return false;
             if (IsDestroyedGatherJob(job)) return false;
+            if (IsPermanentGatherJob(job)) return false;
 
             // Unassign occupying workers before locking.
             var elves = Soup.Game.ElfManager.Instance;
@@ -797,7 +802,8 @@ namespace Soup.Jobs
             if (!CanUnlockMore(JobType.Gather)) return false;
 
             bool ok = UnlockInternal(job);
-            _gatherOffer.Clear();
+            if (ok)
+                _gatherOffer.Clear();
             return ok;
         }
 
@@ -960,6 +966,9 @@ namespace Soup.Jobs
             bool removed = _unlocked.Remove(job);
             _advancePaths.Remove(job);
             _designatedGatherAuraTargets.Remove(job);
+            // 锁岗时清理挂在该岗上的残留状态，避免同 JobItem 重新解锁时旧修饰「复活」。
+            _pendingGatherEfficiencyPenalty.Remove(job);
+            _eventMods.Remove(job);
 
             // Drop aura bindings that pointed at a now-locked job.
             if (removed)

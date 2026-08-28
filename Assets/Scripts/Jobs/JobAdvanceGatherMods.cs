@@ -620,9 +620,14 @@ namespace Soup.Jobs
             var progression = JobProgressionManager.Instance;
             if (progression == null) return false;
 
+            var employees = EmployeeManager.Instance;
             foreach (var job in progression.GetUnlocked(JobType.Gather))
             {
                 if (job == null) continue;
+                // 只考虑当前有在岗员工的岗位，避免「排序第一的最大概率岗无人」
+                // 导致整回合激励产出为 0（我爱坨坨多岗共享路径时尤其明显）。
+                int workers = employees != null ? employees.GetAssignedCountOnJob(job) : 0;
+                if (workers <= 0) continue;
                 var mods = From(job, progression.GetAdvancePath(job));
                 if (mods.EndTurnIncentiveChancePerWorker <= chancePerWorker) continue;
                 chancePerWorker = mods.EndTurnIncentiveChancePerWorker;

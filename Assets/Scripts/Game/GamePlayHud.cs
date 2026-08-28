@@ -143,16 +143,21 @@ namespace Soup.Game
 
             EnsureStyles();
 
+            // IMGUI 逻辑坐标 = 物理像素 ÷ DPI 缩放（打包后 Windows 高 DPI 下必须校正）。
+            float ppu = Mathf.Max(1f, GUI.matrix.m00);
+            float screenW = Screen.width / ppu;
+            float screenH = Screen.height / ppu;
+
             // Dim background
             var dim = new Color(0f, 0f, 0f, 0.55f);
             GUI.color = dim;
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(0, 0, screenW, screenH), Texture2D.whiteTexture);
             GUI.color = Color.white;
 
             // Large modal (~88% screen), not edge-to-edge.
-            float width = Mathf.Min(Screen.width * 0.88f, Screen.width - 64f);
-            float height = Mathf.Min(Screen.height * 0.88f, Screen.height - 64f);
-            var area = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            float width = Mathf.Min(screenW * 0.88f, screenW - 64f);
+            float height = Mathf.Min(screenH * 0.88f, screenH - 64f);
+            var area = new Rect((screenW - width) * 0.5f, (screenH - height) * 0.5f, width, height);
             GUILayout.BeginArea(area, "box");
 
             GUILayout.BeginHorizontal();

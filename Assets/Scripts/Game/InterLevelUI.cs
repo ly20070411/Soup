@@ -131,6 +131,13 @@ namespace Soup.Game
             if (levels.HasActiveClearRewards || levels.IsLost || levels.IsCampaignComplete) return;
             if (levels.IsInProgress)
                 LeaveToPlay();
+            else if (levels.IsWon && !levels.HasActiveClearRewards && !levels.IsCampaignComplete)
+            {
+                // 异常中间态（已通关但奖励会话未激活且未推进下一关）：
+                // 兜底推进，避免玩家卡在关卡间页面无法前进。
+                if (!levels.TryAdvanceToNextLevel())
+                    LeaveToPlay();
+            }
         }
 
         private void OnRewardsChanged() => Refresh();

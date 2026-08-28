@@ -449,6 +449,9 @@ namespace Soup.Levels
 
             // 当前回合号从 1 起。旧存档若存 0（未开始），升为 1。
             _levelTurnIndex = levelTurnIndex <= 0 ? 1 : levelTurnIndex;
+            // 关卡调节可能调低了 MaxTurns；恢复后按上限 clamp，避免越界立即判负。
+            if (_current != null)
+                _levelTurnIndex = Mathf.Clamp(_levelTurnIndex, 1, Mathf.Max(1, _current.MaxTurns));
 
             LevelItem item = null;
             if (!string.IsNullOrEmpty(levelId))
@@ -472,8 +475,15 @@ namespace Soup.Levels
                 _levelListIndex = 0;
             }
 
-            if (_outcome == LevelOutcome.InProgress)
+            // 正常存档落在 1..MaxTurns 内，玩家仍有最后一回合操作权，胜负判定
+            // 延后到实际点击「下一回合」（OnTurnResolved）。只有异常越界存档
+            // （levelTurnIndex 超出 MaxTurns，需补结算）才在此立即结算。
+            if (_outcome == LevelOutcome.InProgress
+                && _current != null
+                && _levelTurnIndex > _current.MaxTurns)
+            {
                 Evaluate(silent: true);
+            }
 
             if (_awaitingClearSequence || (_outcome == LevelOutcome.Won && !IsCampaignComplete))
             {
@@ -829,7 +839,9 @@ namespace Soup.Levels
             _awaitingClearSequence = false;
             _rewards.Clear();
 
-            if (!TryAdvanceToNextLevel())
+            // 只有「已通关且确无下一关」才算全战役通关；
+            // TryAdvanceToNextLevel 也可能因状态非法返回 false，不应误报通关。
+            if (!TryAdvanceToNextLevel() && _outcome == LevelOutcome.Won && GetNextLevel() == null)
             {
                 CampaignCompleted?.Invoke();
                 RaiseChanged();
